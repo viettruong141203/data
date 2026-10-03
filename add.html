@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Face ID - Đăng Ký Nhân Sự</title>
+  
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script defer src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+
+  <style>
+    :root {
+      --primary: #4F46E5; --primary-hover: #4338CA; --danger: #EF4444;
+      --bg-color: #F3F4F6; --card-bg: #FFFFFF; --text-main: #1F2937;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
+    body { background-color: var(--bg-color); color: var(--text-main); display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 15px; }
+    .app-container { background: var(--card-bg); border-radius: 20px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08); width: 100%; max-width: 500px; overflow: hidden; display: flex; flex-direction: column; padding: 25px; text-align: center; }
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .header h2 { font-size: 1.2rem; }
+    
+    .status-badge { font-size: 0.8rem; font-weight: 600; padding: 5px 10px; border-radius: 20px; background: #FEF3C7; color: #D97706; }
+    .status-badge.ready { background: #D1FAE5; color: #059669; }
+    .status-badge.error { background: #FEE2E2; color: #DC2626; }
+
+    .video-wrapper {
+      position: relative; width: 220px; height: 220px; border-radius: 50%;
+      overflow: hidden; background: #111; border: 4px solid var(--primary);
+      margin: 0 auto 20px auto; box-shadow: 0 0 20px rgba(79, 70, 229, 0.3);
+    }
+    .video-wrapper.scanning { animation: pulseReg 1.5s infinite; }
+    @keyframes pulseReg {
+      0% { box-shadow: 0 0 0 0 rgba(79, 70, 229, 0.7); }
+      70% { box-shadow: 0 0 0 15px rgba(79, 70, 229, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(79, 70, 229, 0); }
+    }
+    #video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+
+    .input-group { margin-bottom: 12px; text-align: left; }
+    .input-group label { font-size: 0.85rem; font-weight: 600; color: #4B5563; display: block; margin-bottom: 4px; }
+    .input-group input { width: 100%; padding: 10px 12px; border: 1px solid #D1D5DB; border-radius: 8px; outline: none; }
+    
+    .btn { width: 100%; padding: 12px; border: none; border-radius: 8px; font-weight: 600; color: white; cursor: pointer; transition: 0.2s; font-size: 1rem; margin-top: 10px; }
+    .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+    .btn-primary { background: var(--primary); }
+    .btn-primary:hover { background: var(--primary-hover); }
+  </style>
+</head>
+<body>
+
+  <div class="app-container">
+    <div class="header">
+      <h2>📸 Đăng Ký Nhân Sự</h2>
+      <div id="status-badge" class="status-badge">⏳ Đang tải AI...</div>
+    </div>
+
+    <div class="video-wrapper" id="video-wrapper">
+      <video id="video" autoplay muted playsinline></video>
+    </div>
+
+    <div class="input-group">
+      <label>Mã Nhân Viên</label>
+      <input type="text" id="empId" placeholder="VD: NV01">
+    </div>
+    <div class="input-group">
+      <label>Họ và Tên</label>
+      <input type="text" id="empName" placeholder="VD: Nguyễn Văn A">
+    </div>
+
+    <button id="btnRegister" class="btn btn-primary" onclick="registerFace()" disabled>Chụp & Lưu Lên Sheets</button>
+    
+    <!-- Link quay lại trang Check-in -->
+    <a href="index.html" style="font-size: 0.9rem; color: #10B981; text-decoration: none; margin-top: 15px; display: block;">⬅️ Quay lại trang Check-in</a>
+  </div>
+
+  <script>
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzLFwJo3omYl1N7nyqCD5Lq7GJzGc4dCWrpUYWg7IgGiu6e-Budpn4aGrySBEvvPcCI/exec"; 
+    
+    const video = document.getElementById('video');
+    const videoWrapper = document.getElementById('video-wrapper');
+    const statusBadge = document.getElementById('status-badge');
+    const btnRegister = document.getElementById('btnRegister');
+
+    function setStatus(text, type = 'loading') {
+      statusBadge.innerText = text;
+      statusBadge.className = 'status-badge';
+      if (type === 'ready') statusBadge.classList.add('ready');
+      if (type === 'error') statusBadge.classList.add('error');
+    }
+
+    async function loadModels() {
+      const MODEL_URL = 'https://justadudewhohacks.github.io/face-api.js/models';
+      try {
+        await Promise.all([
+          faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL),
+          faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+          faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
+        ]);
+        setStatus("Sẵn sàng đăng ký", "ready");
+        startCamera();
+      } catch (e) {
+        setStatus("Lỗi tải AI", "error");
+      }
+    }
+
+    async function startCamera() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+        video.srcObject = stream;
+        video.onloadedmetadata = () => {
+          btnRegister.disabled = false;
+        };
+      } catch (err) {
+        setStatus("Không mở được Camera", "error");
+      }
+    }
+
+    async function registerFace() {
+      const id = document.getElementById("empId").value.trim();
+      const name = document.getElementById("empName").value.trim();
+
+      if (!id || !name) {
+        alert("Vui lòng điền đầy đủ Mã và Tên nhân viên!");
+        return;
+      }
+
+      btnRegister.disabled = true;
+      videoWrapper.classList.add("scanning");
+      setStatus("Đang quét mặt...", "loading");
+
+      const detection = await faceapi.detectSingleFace(video).withFaceLandmarks().withFaceDescriptor();
+      videoWrapper.classList.remove("scanning");
+
+      if (!detection) {
+        alert("Không tìm thấy khuôn mặt! Hãy nhìn thẳng vào giữa khung hình.");
+        setStatus("Sẵn sàng đăng ký", "ready");
+        btnRegister.disabled = false;
+        return;
+      }
+
+      setStatus("Đang lưu Google Sheets...", "loading");
+      const payload = {
+        id: id,
+        name: name,
+        faceData: JSON.stringify(Array.from(detection.descriptor))
+      };
+
+      try {
+        const response = await fetch(SCRIPT_URL, {
+          method: 'POST',
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify(payload)
+        });
+
+        const result = await response.json();
+        if (result.status === "success") {
+          alert("🎉 Đăng ký khuôn mặt thành công!");
+          document.getElementById("empId").value = "";
+          document.getElementById("empName").value = "";
+          setStatus("Sẵn sàng đăng ký", "ready");
+        } else {
+          alert("Lỗi từ server: " + result.message);
+          setStatus("Sẵn sàng đăng ký", "ready");
+        }
+      } catch (error) {
+        alert("Lỗi kết nối khi lưu dữ liệu!");
+        setStatus("Sẵn sàng đăng ký", "ready");
+      }
+      btnRegister.disabled = false;
+    }
+
+    window.onload = loadModels;
+  </script>
+</body>
+</html>
