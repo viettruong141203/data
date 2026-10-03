@@ -3,39 +3,36 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Face ID - Camera Tràn Màn Hình</title>
+  <title>Face ID - AI Vision Security</title>
   
   <script defer src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
 
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Space Grotesk', sans-serif; }
     
-    /* Thiết lập màn hình nền đen tuyệt đối, căn giữa camera */
     body, html {
       width: 100%; height: 100%;
-      background-color: #000;
+      background-color: #030712;
       overflow: hidden;
       display: flex;
       justify-content: center;
       align-items: center;
     }
 
-    /* Container chứa camera chiếm toàn bộ không gian */
-    .camera-fullscreen {
+    .camera-container {
       position: relative;
       width: 100%;
       height: 100%;
-      display: flex;
-      justify-content: center;
-      align-items: center;
+      overflow: hidden;
     }
 
     #video {
       width: 100%;
       height: 100%;
-      object-fit: cover; /* Lấp đầy toàn màn hình mà không méo ảnh */
+      object-fit: cover;
       display: block;
-      transform: scaleX(-1); /* Lật gương camera trước */
+      transform: scaleX(-1);
     }
 
     canvas {
@@ -48,30 +45,76 @@
       pointer-events: none;
     }
 
-    /* Dòng trạng thái nhỏ gọn chìm ở góc dưới (có thể ẩn đi nếu không muốn thấy chữ) */
-    .status-floating {
+    /* Hiệu ứng khung viền HUD công nghệ cao 4 góc */
+    .hud-overlay {
       position: absolute;
-      bottom: 20px;
+      top: 0; left: 0; width: 100%; height: 100%;
+      pointer-events: none;
+      box-shadow: inset 0 0 100px rgba(0, 0, 0, 0.6);
+    }
+    
+    .hud-overlay::before, .hud-overlay::after {
+      content: ''; position: absolute; width: 40px; height: 40px; border-color: rgba(99, 102, 241, 0.6); border-style: solid; transition: all 0.3s;
+    }
+    .hud-overlay::before { top: 20px; left: 20px; border-width: 3px 0 0 3px; }
+    .hud-overlay::after { top: 20px; right: 20px; border-width: 3px 3px 0 0; }
+
+    .hud-bottom-corners::before, .hud-bottom-corners::after {
+      content: ''; position: absolute; width: 40px; height: 40px; border-color: rgba(99, 102, 241, 0.6); border-style: solid;
+    }
+    .hud-bottom-corners::before { bottom: 20px; left: 20px; border-width: 0 0 3px 3px; }
+    .hud-bottom-corners::after { bottom: 20px; right: 20px; border-width: 0 3px 3px 0; }
+
+    /* Thanh trạng thái tối giản siêu đẹp ở góc dưới */
+    .status-pill {
+      position: absolute;
+      bottom: 30px;
       left: 50%;
       transform: translateX(-50%);
-      background: rgba(0, 0, 0, 0.6);
-      color: #fff;
-      padding: 8px 16px;
-      border-radius: 20px;
-      font-family: sans-serif;
-      font-size: 0.85rem;
-      backdrop-filter: blur(5px);
-      border: 1px solid rgba(255, 255, 255, 0.2);
+      background: rgba(15, 23, 42, 0.75);
+      color: #E2E8F0;
+      padding: 10px 24px;
+      border-radius: 30px;
+      font-size: 0.9rem;
+      letter-spacing: 0.5px;
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
       z-index: 10;
-      pointer-events: none;
+      transition: opacity 0.5s ease;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .dot {
+      width: 8px; height: 8px; background-color: #F59E0B; border-radius: 50%;
+      box-shadow: 0 0 8px #F59E0B; animation: pulseDot 1.5s infinite;
+    }
+    .dot.ready { background-color: #10B981; box-shadow: 0 0 10px #10B981; }
+
+    @keyframes pulseDot {
+      0% { transform: scale(0.95); opacity: 0.8; }
+      50% { transform: scale(1.25); opacity: 1; }
+      100% { transform: scale(0.95); opacity: 0.8; }
     }
   </style>
 </head>
 <body>
 
-  <div class="camera-fullscreen" id="container">
+  <div class="camera-container" id="container">
     <video id="video" autoplay muted playsinline></video>
-    <div id="status" class="status-floating">Đang tải mô hình AI...</div>
+    
+    <!-- Khung trang trí HUD Công nghệ -->
+    <div class="hud-overlay">
+      <div class="hud-bottom-corners"></div>
+    </div>
+
+    <!-- Thanh trạng thái -->
+    <div id="status" class="status-pill">
+      <div id="dot" class="dot"></div>
+      <span id="status-text">Đang khởi tạo hệ thống AI...</span>
+    </div>
   </div>
 
   <script>
@@ -83,24 +126,26 @@
 
     const video = document.getElementById('video');
     const container = document.getElementById('container');
-    const statusText = document.getElementById('status');
+    const statusText = document.getElementById('status-text');
+    const statusDot = document.getElementById('dot');
+    const statusBox = document.getElementById('status');
 
-    // 1. Tải mô hình AI từ CDN
+    // 1. Tải mô hình AI
     async function loadModels() {
       const MODEL_URL = 'https://justadudewhohacks.github.io/face-api.js/models';
       try {
-        statusText.innerText = "Đang tải AI...";
+        statusText.innerText = "Đang tải mô hình trí tuệ nhân tạo...";
         await faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL);
         await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
         await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
         
         startCamera();
       } catch (e) {
-        statusText.innerText = "Lỗi tải AI!";
+        statusText.innerText = "Lỗi tải mô hình AI!";
       }
     }
 
-    // 2. Mở Camera toàn màn hình & tạo Canvas đè lên
+    // 2. Khởi động Camera
     async function startCamera() {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ 
@@ -120,13 +165,14 @@
           loadDataFromAppsScript();
         };
       } catch (err) {
-        statusText.innerText = "Không thể mở Camera!";
+        statusText.innerText = "Không thể bật Camera!";
       }
     }
 
-    // 3. Tải cơ sở dữ liệu khuôn mặt từ Google Sheets
+    // 3. Tải cơ sở dữ liệu từ Google Sheets
     async function loadDataFromAppsScript() {
       try {
+        statusText.innerText = "Đang đồng bộ dữ liệu nhân sự...";
         const response = await fetch(SCRIPT_URL);
         const result = await response.json();
         
@@ -150,20 +196,24 @@
                 );
               }
             } catch (err) {
-              console.error("Lỗi parse dòng:", err);
+              console.error("Lỗi parse dữ liệu:", err);
             }
           }
 
           if (labeledFaceDescriptors.length > 0) {
             faceMatcher = new faceapi.FaceMatcher(labeledFaceDescriptors, 0.60);
-            statusText.innerText = `Đang quét (${labeledFaceDescriptors.length} NV)`;
+            statusText.innerText = `Hệ thống sẵn sàng (${labeledFaceDescriptors.length} nhân sự)`;
+            statusDot.classList.add('ready');
             
-            // Tự động ẩn dòng trạng thái sau 3 giây để màn hình hoàn toàn trống, chỉ còn camera
-            setTimeout(() => { statusText.style.display = 'none'; }, 3000);
+            // Tự động ẩn thanh trạng thái sau 3.5 giây để màn hình hoàn toàn trong suốt, chỉ giữ lại camera & khung quét
+            setTimeout(() => { 
+              statusBox.style.opacity = '0';
+              setTimeout(() => statusBox.style.display = 'none', 500);
+            }, 3500);
 
             startRecognitionLoop();
           } else {
-            statusText.innerText = "Chưa có dữ liệu nhân sự trên Sheets";
+            statusText.innerText = "Chưa có dữ liệu nhân sự trên Google Sheets!";
           }
         }
       } catch (error) {
@@ -171,7 +221,7 @@
       }
     }
 
-    // 4. Vòng lặp nhận diện & vẽ khung tên nổi trực tiếp lên mặt
+    // 4. Vòng lặp nhận diện khuôn mặt
     function startRecognitionLoop() {
       setInterval(async () => {
         if (!faceMatcher || isDetecting || video.paused || video.ended) return;
@@ -190,19 +240,29 @@
             const bestMatch = faceMatcher.findBestMatch(detection.descriptor);
             const box = detection.detection.box;
 
-            // Vẽ khung viền và tên trực tiếp lên khuôn mặt
+            // Tùy chỉnh màu sắc khung nổi (Xanh ngọc sang trọng cho nhân viên, Đỏ cảnh báo cho người lạ)
+            const isStranger = bestMatch.label === "unknown";
+            const boxColor = isStranger ? "#EF4444" : "#10B981";
+            const labelText = isStranger ? "⚠️️ Người Lạ" : `✅ ${bestMatch.label}`;
+
             const drawBox = new faceapi.draw.DrawBox(box, {
-              label: bestMatch.label === "unknown" ? "Người lạ" : bestMatch.label,
-              boxColor: bestMatch.label === "unknown" ? "#EF4444" : "#10B981"
+              label: labelText,
+              boxColor: boxColor,
+              drawLabelOptions: {
+                backgroundColor: isStranger ? 'rgba(239, 68, 68, 0.85)' : 'rgba(16, 185, 129, 0.85)',
+                fontColor: '#FFFFFF',
+                fontSize: 16,
+                padding: 8
+              }
             });
             drawBox.draw(canvas);
           }
         } catch (err) {
-          console.error("Lỗi nhận diện:", err);
+          console.error("Lỗi quét:", err);
         }
 
         isDetecting = false;
-      }, 600);
+      }, 500); // Tốc độ quét cực mượt 0.5 giây / lần
     }
 
     window.onload = loadModels;
