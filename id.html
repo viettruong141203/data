@@ -3,119 +3,182 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Face ID - Nhận Diện Chính Xác Cao</title>
+  <title>Face ID - Pro Vision</title>
   
   <script defer src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
+    /* Sử dụng font chữ Plus Jakarta Sans hiện đại, tròn trịa */
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', sans-serif; }
     
+    /* Nền trang: dải màu pastel sáng dịu mắt, sang trọng */
     body, html {
       width: 100%; height: 100%;
-      background-color: #F1F5F9;
+      background: linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%);
       display: flex;
       justify-content: center;
       align-items: center;
-      padding: 15px;
+      padding: 20px;
     }
 
+    /* Hiệu ứng kính mờ (Glassmorphism) cho thẻ App */
     .app-card {
-      background: #FFFFFF;
-      padding: 20px;
-      border-radius: 24px;
-      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08);
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      padding: 24px;
+      border-radius: 32px;
+      box-shadow: 0 24px 48px rgba(0, 0, 0, 0.1), inset 0 0 0 1px rgba(255, 255, 255, 0.5);
       width: 100%;
-      max-width: 600px; 
+      max-width: 480px; 
       display: flex;
       flex-direction: column;
-      gap: 16px;
-      border: 1px solid #E2E8F0;
+      gap: 20px;
     }
 
+    /* Tiêu đề Ứng dụng */
+    .app-header {
+      text-align: center;
+    }
+    .app-header h2 {
+      font-size: 1.25rem;
+      font-weight: 800;
+      color: #1E293B;
+      letter-spacing: -0.5px;
+    }
+    .app-header p {
+      font-size: 0.85rem;
+      color: #64748B;
+      margin-top: 4px;
+      font-weight: 500;
+    }
+
+    /* Khung Camera bo góc mạnh, bóng đổ sâu */
     .camera-container {
       position: relative;
       width: 100%;
-      aspect-ratio: 16 / 10; 
-      background: #000;
-      border-radius: 16px;
+      aspect-ratio: 3 / 4; /* Tỷ lệ dọc phù hợp cho khuôn mặt */
+      background: #0F172A;
+      border-radius: 24px;
       overflow: hidden;
+      box-shadow: 0 12px 24px rgba(0,0,0,0.15);
+      border: 4px solid #FFFFFF;
     }
 
     #video {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      display: block;
+      width: 100%; height: 100%; object-fit: cover; display: block;
     }
-
     #video.front-camera { transform: scaleX(-1); }
     #video.back-camera { transform: scaleX(1); }
 
     canvas {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      pointer-events: none;
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;
     }
     canvas.front-camera { transform: scaleX(-1); }
     canvas.back-camera { transform: scaleX(1); }
 
+    /* Hiệu ứng tia laser quét lên xuống ngầu */
+    .scan-line {
+      position: absolute;
+      width: 100%;
+      height: 4px;
+      background: linear-gradient(90deg, transparent, rgba(99, 102, 241, 0.8), transparent);
+      box-shadow: 0 0 15px rgba(99, 102, 241, 0.8);
+      top: 0;
+      left: 0;
+      animation: scan 2.5s infinite linear;
+      z-index: 5;
+      display: none;
+    }
+    @keyframes scan {
+      0% { top: 0%; opacity: 0; }
+      10% { opacity: 1; }
+      90% { opacity: 1; }
+      100% { top: 100%; opacity: 0; }
+    }
+
+    /* Nút đổi camera: Tròn, kính mờ, nổi bật */
     .switch-btn {
       position: absolute;
-      top: 14px;
-      right: 14px;
-      width: 40px;
-      height: 40px;
-      background: rgba(15, 23, 42, 0.65);
+      top: 16px; right: 16px;
+      width: 44px; height: 44px;
+      background: rgba(255, 255, 255, 0.25);
       color: #FFFFFF;
-      border: 1px solid rgba(255, 255, 255, 0.2);
+      border: 1px solid rgba(255, 255, 255, 0.4);
       border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1.1rem;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.2rem;
       cursor: pointer;
-      backdrop-filter: blur(6px);
+      backdrop-filter: blur(10px);
       z-index: 10;
-      transition: all 0.2s ease;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
     }
-    .switch-btn:hover { background: rgba(15, 23, 42, 0.85); transform: scale(1.05); }
+    .switch-btn:hover { background: rgba(255, 255, 255, 0.4); transform: scale(1.1) rotate(180deg); }
 
+    /* Thẻ thông tin phía dưới - Thiết kế tự động đổi màu theo trạng thái */
     .info-box {
       background: #F8FAFC;
-      border: 1px solid #E2E8F0;
-      border-radius: 14px;
-      padding: 14px 18px;
+      border: 2px solid #E2E8F0;
+      border-radius: 20px;
+      padding: 16px 20px;
       display: flex;
       align-items: center;
-      gap: 12px;
-      transition: all 0.2s ease;
+      gap: 16px;
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    /* Trạng thái mặc định / Đang quét */
+    .info-box.scanning { background: #EEF2FF; border-color: #C7D2FE; box-shadow: 0 8px 16px rgba(99, 102, 241, 0.1); }
+    .info-box.scanning .info-icon { background: #6366F1; color: #fff; box-shadow: 0 0 15px rgba(99, 102, 241, 0.4); }
+    
+    /* Trạng thái Thành công */
+    .info-box.success { background: #ECFDF5; border-color: #A7F3D0; box-shadow: 0 8px 16px rgba(16, 185, 129, 0.1); }
+    .info-box.success .info-icon { background: #10B981; color: #fff; box-shadow: 0 0 15px rgba(16, 185, 129, 0.4); }
+    
+    /* Trạng thái Cảnh báo / Người lạ */
+    .info-box.danger { background: #FFF1F2; border-color: #FECDD3; box-shadow: 0 8px 16px rgba(244, 63, 94, 0.1); }
+    .info-box.danger .info-icon { background: #F43F5E; color: #fff; box-shadow: 0 0 15px rgba(244, 63, 94, 0.4); }
+
+    .info-icon {
+      width: 48px; height: 48px;
+      background: #94A3B8; color: #fff;
+      border-radius: 14px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.4rem;
+      transition: all 0.3s;
     }
 
-    .info-icon { font-size: 1.5rem; display: flex; align-items: center; justify-content: center; }
-    .info-content { display: flex; flex-direction: column; gap: 2px; }
-    .info-title { font-size: 0.75rem; text-transform: uppercase; color: #64748B; font-weight: 600; }
-    .info-text { font-size: 0.95rem; font-weight: 700; color: #1E293B; }
+    .info-content { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+    .info-title { font-size: 0.75rem; text-transform: uppercase; color: #64748B; font-weight: 700; letter-spacing: 0.5px; }
+    .info-text { font-size: 1rem; font-weight: 800; color: #0F172A; }
+
   </style>
 </head>
 <body>
 
   <div class="app-card">
+    
+    <div class="app-header">
+      <h2>Face ID Scanner</h2>
+      <p>Hệ thống nhận diện thông minh</p>
+    </div>
+
     <div class="camera-container" id="container">
-      <button class="switch-btn" onclick="switchCamera()" title="Đổi camera trước/sau">🔄</button>
+      <button class="switch-btn" onclick="switchCamera()" title="Đổi camera">🔄</button>
+      <div id="scan-line" class="scan-line"></div>
       <video id="video" autoplay muted playsinline></video>
     </div>
 
     <div id="info-box" class="info-box">
       <div id="info-icon" class="info-icon">⏳</div>
       <div class="info-content">
-        <span class="info-title">Trạng thái nhận diện</span>
-        <span id="info-text" class="info-text">Đang khởi động hệ thống AI...</span>
+        <span class="info-title">Trạng thái</span>
+        <span id="info-text" class="info-text">Đang khởi tạo AI...</span>
       </div>
     </div>
+
   </div>
 
   <script>
@@ -131,33 +194,39 @@
 
     const video = document.getElementById('video');
     const container = document.getElementById('container');
+    const scanLine = document.getElementById('scan-line');
+    
     const infoBox = document.getElementById('info-box');
     const infoIcon = document.getElementById('info-icon');
     const infoText = document.getElementById('info-text');
 
-    function updateStatus(icon, text, borderColor, bgColor) {
+    // Hàm cập nhật trạng thái UI tự động
+    function updateStatusUI(state, icon, text) {
       infoIcon.innerText = icon;
       infoText.innerText = text;
-      infoBox.style.borderColor = borderColor;
-      infoBox.style.backgroundColor = bgColor;
+      
+      // Xóa hết class cũ
+      infoBox.classList.remove('scanning', 'success', 'danger');
+      if (state) infoBox.classList.add(state);
     }
 
     async function loadModels() {
       const MODEL_URL = 'https://justadudewhohacks.github.io/face-api.js/models';
       try {
-        updateStatus("⏳", "Đang tải mô hình AI tối ưu...", "#E2E8F0", "#F8FAFC");
+        updateStatusUI('', '⏳', 'Đang tải AI...');
         await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
         await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
         await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
         
         startCamera(currentFacingMode);
       } catch (e) {
-        updateStatus("❌", "Lỗi tải mô hình AI từ mạng!", "#EF4444", "#FEF2F2");
+        updateStatusUI('danger', '❌', 'Lỗi mạng: Không thể tải AI');
       }
     }
 
     async function startCamera(facingMode) {
       isRunning = false;
+      scanLine.style.display = 'none';
 
       if (currentStream) {
         currentStream.getTracks().forEach(track => track.stop());
@@ -165,7 +234,7 @@
 
       try {
         const constraints = {
-          video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: facingMode }
+          video: { width: { ideal: 720 }, height: { ideal: 960 }, facingMode: facingMode }
         };
         
         currentStream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -197,7 +266,7 @@
           }
         };
       } catch (err) {
-        updateStatus("📷", "Không thể truy cập Camera!", "#EF4444", "#FEF2F2");
+        updateStatusUI('danger', '📷', 'Vui lòng cấp quyền Camera');
       }
     }
 
@@ -208,7 +277,7 @@
 
     async function loadDataFromAppsScript() {
       try {
-        updateStatus("🔄", "Đang đồng bộ dữ liệu nhân sự...", "#CBD5E1", "#F8FAFC");
+        updateStatusUI('', '🔄', 'Đang tải dữ liệu...');
         const response = await fetch(SCRIPT_URL);
         const result = await response.json();
         
@@ -237,22 +306,23 @@
           }
 
           if (labeledFaceDescriptors.length > 0) {
-            // 🛑 SIẾT CHẶT NGƯỠNG NHẬN DIỆN XUỐNG 0.45 Ở ĐÂY ĐỂ CHỐNG NHẬN NHẦM
+            // Ngưỡng 0.45 bảo mật cực cao, chống nhận nhầm tuyệt đối
             faceMatcher = new faceapi.FaceMatcher(labeledFaceDescriptors, 0.45);
-            updateStatus("👀", `Đang quét tìm khuôn mặt (${labeledFaceDescriptors.length} NV)...`, "#CBD5E1", "#F8FAFC");
-            
             startSmoothRecognition();
           } else {
-            updateStatus("⚠️", "Chưa có dữ liệu nhân sự trên Sheets!", "#F59E0B", "#FEF3C7");
+            updateStatusUI('danger', '⚠️', 'Chưa có nhân sự trên Sheets');
           }
         }
       } catch (error) {
-        updateStatus("🔌", "Lỗi kết nối máy chủ Apps Script!", "#EF4444", "#FEF2F2");
+        updateStatusUI('danger', '🔌', 'Lỗi kết nối máy chủ');
       }
     }
 
     async function startSmoothRecognition() {
       isRunning = true;
+      scanLine.style.display = 'block'; // Hiện tia laser quét
+      updateStatusUI('scanning', '🎯', 'Đang quét khuôn mặt...');
+
       const options = new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 });
       const ctx = canvas.getContext('2d');
 
@@ -267,36 +337,39 @@
           ctx.clearRect(0, 0, canvas.width, canvas.height);
 
           if (!detection) {
-            updateStatus("👀", "Đang tìm kiếm khuôn mặt trước ống kính...", "#CBD5E1", "#F8FAFC");
+            updateStatusUI('scanning', '🎯', 'Đang quét khuôn mặt...');
           } else {
             const resizedDetection = faceapi.resizeResults(detection, displaySize);
             const bestMatch = faceMatcher.findBestMatch(resizedDetection.descriptor);
             const box = resizedDetection.detection.box;
 
             const isStranger = bestMatch.label === "unknown";
-            const boxColor = isStranger ? "#EF4444" : "#10B981";
-            const labelText = isStranger ? "Người lạ" : bestMatch.label;
+            const boxColor = isStranger ? "#F43F5E" : "#10B981"; 
+            const labelText = isStranger ? "Người lạ" : bestMatch.label.split(' - ')[1] || bestMatch.label;
 
+            // Vẽ khung hiện đại, bo tròn nhẹ
             const drawBox = new faceapi.draw.DrawBox(box, {
               label: labelText,
               boxColor: boxColor,
+              lineWidth: 3,
               drawLabelOptions: {
                 backgroundColor: boxColor,
                 fontColor: '#FFFFFF',
-                fontSize: 14,
-                padding: 6
+                fontSize: 16,
+                padding: 10
               }
             });
             drawBox.draw(canvas);
 
+            // Cập nhật thẻ trạng thái phía dưới
             if (isStranger) {
-              updateStatus("🚫", "Phát hiện: Người lạ (Chưa đăng ký)", "#EF4444", "#FEF2F2");
+              updateStatusUI('danger', '🚫', 'Người lạ (Chưa đăng ký)');
             } else {
-              updateStatus("✅", `Xin chào: ${bestMatch.label}`, "#10B981", "#ECFDF5");
+              updateStatusUI('success', '✅', `Xin chào: ${labelText}`);
             }
           }
         } catch (err) {
-          console.error("Lỗi khung hình:", err);
+          console.error("Lỗi AI:", err);
         }
 
         if (isRunning) {
