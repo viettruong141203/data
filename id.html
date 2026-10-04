@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Face ID - Nhận Diện Siêu Mượt</title>
+  <title>Face ID - Nhận Diện Khuôn Mặt</title>
   
   <script defer src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -20,23 +20,25 @@
       padding: 15px;
     }
 
+    /* Mở rộng chiều rộng khung app lên tối đa 600px để camera to rõ hơn */
     .app-card {
       background: #FFFFFF;
       padding: 20px;
       border-radius: 24px;
       box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08);
       width: 100%;
-      max-width: 440px;
+      max-width: 600px; 
       display: flex;
       flex-direction: column;
       gap: 16px;
       border: 1px solid #E2E8F0;
     }
 
+    /* Khung camera to hơn (Tỷ lệ 16:9 hiện đại) */
     .camera-container {
       position: relative;
       width: 100%;
-      aspect-ratio: 4 / 3;
+      aspect-ratio: 16 / 10; 
       background: #000;
       border-radius: 16px;
       overflow: hidden;
@@ -47,8 +49,10 @@
       height: 100%;
       object-fit: cover;
       display: block;
-      transform: scaleX(-1);
     }
+
+    #video.front-camera { transform: scaleX(-1); }
+    #video.back-camera { transform: scaleX(1); }
 
     canvas {
       position: absolute;
@@ -56,9 +60,32 @@
       left: 0;
       width: 100%;
       height: 100%;
-      transform: scaleX(-1);
       pointer-events: none;
     }
+    canvas.front-camera { transform: scaleX(-1); }
+    canvas.back-camera { transform: scaleX(1); }
+
+    /* Nút đổi camera thu gọn thành icon tròn tinh tế */
+    .switch-btn {
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      width: 40px;
+      height: 40px;
+      background: rgba(15, 23, 42, 0.65);
+      color: #FFFFFF;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.1rem;
+      cursor: pointer;
+      backdrop-filter: blur(6px);
+      z-index: 10;
+      transition: all 0.2s ease;
+    }
+    .switch-btn:hover { background: rgba(15, 23, 42, 0.85); transform: scale(1.05); }
 
     .info-box {
       background: #F8FAFC;
@@ -81,6 +108,8 @@
 
   <div class="app-card">
     <div class="camera-container" id="container">
+      <!-- Nút đổi camera dạng icon gọn gàng -->
+      <button class="switch-btn" onclick="switchCamera()" title="Đổi camera trước/sau">🔄</button>
       <video id="video" autoplay muted playsinline></video>
     </div>
 
@@ -99,6 +128,9 @@
     let faceMatcher = null; 
     let canvas = null;
     let displaySize = null;
+    let currentFacingMode = "user"; 
+    let currentStream = null;
+    let isRunning = false;
 
     const video = document.getElementById('video');
     const container = document.getElementById('container');
@@ -113,7 +145,7 @@
       infoBox.style.backgroundColor = bgColor;
     }
 
-    // 1. Tải mô hình AI siêu nhẹ (TinyFaceDetector) giúp camera không giật
+    // 1. Tải mô hình AI siêu nhẹ
     async function loadModels() {
       const MODEL_URL = 'https://justadudewhohacks.github.io/face-api.js/models';
       try {
@@ -122,34 +154,59 @@
         await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
         await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
         
-        startCamera();
+        startCamera(currentFacingMode);
       } catch (e) {
         updateStatus("❌", "Lỗi tải mô hình AI từ mạng!", "#EF4444", "#FEF2F2");
       }
     }
 
-    // 2. Khởi động Camera mượt mà
-    async function startCamera() {
+    // 2. Khởi động Camera
+    async function startCamera(facingMode) {
+      if (currentStream) {
+        currentStream.getTracks().forEach(track => track.stop());
+      }
+
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-          video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" } 
-        });
-        video.srcObject = stream;
+        const constraints = {
+          video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: facingMode }
+        };
+        
+        currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+        video.srcObject = currentStream;
+
+        if (facingMode === "user") {
+          video.className = "front-camera";
+          if (canvas) canvas.className = "front-camera";
+        } else {
+          video.className = "back-camera";
+          if (canvas) canvas.className = "back-camera";
+        }
         
         video.onloadedmetadata = () => {
           video.play();
           
-          canvas = faceapi.createCanvasFromMedia(video);
-          container.append(canvas);
+          if (!canvas) {
+            canvas = faceapi.createCanvasFromMedia(video);
+            container.append(canvas);
+          }
           
           displaySize = { width: video.videoWidth, height: video.videoHeight };
           faceapi.matchDimensions(canvas, displaySize);
 
-          loadDataFromAppsScript();
+          if (!faceMatcher) {
+            loadDataFromAppsScript();
+          } else if (!isRunning) {
+            startSmoothRecognition();
+          }
         };
       } catch (err) {
         updateStatus("📷", "Không thể truy cập Camera!", "#EF4444", "#FEF2F2");
       }
+    }
+
+    function switchCamera() {
+      currentFacingMode = (currentFacingMode === "user") ? "environment" : "user";
+      startCamera(currentFacingMode);
     }
 
     // 3. Tải dữ liệu nhân sự từ Google Sheets
@@ -187,7 +244,6 @@
             faceMatcher = new faceapi.FaceMatcher(labeledFaceDescriptors, 0.60);
             updateStatus("👀", `Đang quét tìm khuôn mặt (${labeledFaceDescriptors.length} NV)...`, "#CBD5E1", "#F8FAFC");
             
-            // Kích hoạt vòng lặp không giật
             startSmoothRecognition();
           } else {
             updateStatus("⚠️", "Chưa có dữ liệu nhân sự trên Sheets!", "#F59E0B", "#FEF3C7");
@@ -198,8 +254,9 @@
       }
     }
 
-    // 4. Vòng lặp nhận diện sử dụng TinyFaceDetector tối ưu hóa tuyệt đối chống giật lag
+    // 4. Vòng lặp nhận diện mượt mà
     async function startSmoothRecognition() {
+      isRunning = true;
       const options = new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 });
       const ctx = canvas.getContext('2d');
 
@@ -224,7 +281,6 @@
             const boxColor = isStranger ? "#EF4444" : "#10B981";
             const labelText = isStranger ? "Người lạ" : bestMatch.label;
 
-            // Vẽ khung trực tiếp cực kỳ mượt
             const drawBox = new faceapi.draw.DrawBox(box, {
               label: labelText,
               boxColor: boxColor,
@@ -247,8 +303,9 @@
           console.error("Lỗi khung hình:", err);
         }
 
-        // Dùng requestAnimationFrame thay vì setInterval giúp camera chạy 60 FPS mượt mà không bị nghẽn
-        requestAnimationFrame(detectFrame);
+        if (isRunning) {
+          requestAnimationFrame(detectFrame);
+        }
       };
 
       detectFrame();
