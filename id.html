@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Face ID - Nhận Diện Khuôn Mặt</title>
+  <title>Face ID - Nhận Diện Chính Xác Cao</title>
   
   <script defer src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -20,7 +20,6 @@
       padding: 15px;
     }
 
-    /* Mở rộng chiều rộng khung app lên tối đa 600px để camera to rõ hơn */
     .app-card {
       background: #FFFFFF;
       padding: 20px;
@@ -34,7 +33,6 @@
       border: 1px solid #E2E8F0;
     }
 
-    /* Khung camera to hơn (Tỷ lệ 16:9 hiện đại) */
     .camera-container {
       position: relative;
       width: 100%;
@@ -65,7 +63,6 @@
     canvas.front-camera { transform: scaleX(-1); }
     canvas.back-camera { transform: scaleX(1); }
 
-    /* Nút đổi camera thu gọn thành icon tròn tinh tế */
     .switch-btn {
       position: absolute;
       top: 14px;
@@ -108,7 +105,6 @@
 
   <div class="app-card">
     <div class="camera-container" id="container">
-      <!-- Nút đổi camera dạng icon gọn gàng -->
       <button class="switch-btn" onclick="switchCamera()" title="Đổi camera trước/sau">🔄</button>
       <video id="video" autoplay muted playsinline></video>
     </div>
@@ -123,6 +119,7 @@
   </div>
 
   <script>
+    // ⚠️ Hãy chắc chắn đây là link Google Apps Script CỦA BẠN
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzLFwJo3omYl1N7nyqCD5Lq7GJzGc4dCWrpUYWg7IgGiu6e-Budpn4aGrySBEvvPcCI/exec"; 
     
     let faceMatcher = null; 
@@ -145,7 +142,6 @@
       infoBox.style.backgroundColor = bgColor;
     }
 
-    // 1. Tải mô hình AI siêu nhẹ
     async function loadModels() {
       const MODEL_URL = 'https://justadudewhohacks.github.io/face-api.js/models';
       try {
@@ -160,8 +156,9 @@
       }
     }
 
-    // 2. Khởi động Camera
     async function startCamera(facingMode) {
+      isRunning = false;
+
       if (currentStream) {
         currentStream.getTracks().forEach(track => track.stop());
       }
@@ -195,7 +192,7 @@
 
           if (!faceMatcher) {
             loadDataFromAppsScript();
-          } else if (!isRunning) {
+          } else {
             startSmoothRecognition();
           }
         };
@@ -209,7 +206,6 @@
       startCamera(currentFacingMode);
     }
 
-    // 3. Tải dữ liệu nhân sự từ Google Sheets
     async function loadDataFromAppsScript() {
       try {
         updateStatus("🔄", "Đang đồng bộ dữ liệu nhân sự...", "#CBD5E1", "#F8FAFC");
@@ -241,7 +237,8 @@
           }
 
           if (labeledFaceDescriptors.length > 0) {
-            faceMatcher = new faceapi.FaceMatcher(labeledFaceDescriptors, 0.60);
+            // 🛑 SIẾT CHẶT NGƯỠNG NHẬN DIỆN XUỐNG 0.45 Ở ĐÂY ĐỂ CHỐNG NHẬN NHẦM
+            faceMatcher = new faceapi.FaceMatcher(labeledFaceDescriptors, 0.45);
             updateStatus("👀", `Đang quét tìm khuôn mặt (${labeledFaceDescriptors.length} NV)...`, "#CBD5E1", "#F8FAFC");
             
             startSmoothRecognition();
@@ -254,14 +251,13 @@
       }
     }
 
-    // 4. Vòng lặp nhận diện mượt mà
     async function startSmoothRecognition() {
       isRunning = true;
       const options = new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 });
       const ctx = canvas.getContext('2d');
 
       const detectFrame = async () => {
-        if (video.paused || video.ended || !faceMatcher) return;
+        if (!isRunning || video.paused || video.ended || !faceMatcher) return;
 
         try {
           const detection = await faceapi.detectSingleFace(video, options)
