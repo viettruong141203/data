@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Face ID - Pro Vision</title>
+  <title>Face ID - Nhận Diện Cao Cấp</title>
   
   <script defer src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -39,14 +39,9 @@
     .app-header p { font-size: 0.85rem; color: #64748B; margin-top: 4px; font-weight: 500; }
 
     .camera-container {
-      position: relative;
-      width: 100%;
-      aspect-ratio: 3 / 4; 
-      background: #0F172A;
-      border-radius: 24px;
-      overflow: hidden;
-      box-shadow: 0 12px 24px rgba(0,0,0,0.15);
-      border: 4px solid #FFFFFF;
+      position: relative; width: 100%; aspect-ratio: 3 / 4; 
+      background: #0F172A; border-radius: 24px; overflow: hidden;
+      box-shadow: 0 12px 24px rgba(0,0,0,0.15); border: 4px solid #FFFFFF;
     }
 
     #video { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -61,8 +56,7 @@
       position: absolute; width: 100%; height: 4px;
       background: linear-gradient(90deg, transparent, rgba(99, 102, 241, 0.8), transparent);
       box-shadow: 0 0 15px rgba(99, 102, 241, 0.8);
-      top: 0; left: 0;
-      animation: scan 2.5s infinite linear; z-index: 5; display: none;
+      top: 0; left: 0; animation: scan 2.5s infinite linear; z-index: 5; display: none;
     }
     @keyframes scan { 0% { top: 0%; opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { top: 100%; opacity: 0; } }
 
@@ -75,28 +69,42 @@
     }
     .switch-btn:hover { background: rgba(255, 255, 255, 0.4); transform: scale(1.1) rotate(180deg); }
 
+    /* Hộp Thông Tin Phía Dưới - Thiết kế dạng Profile Card */
     .info-box {
-      background: #F8FAFC; border: 2px solid #E2E8F0; border-radius: 20px; padding: 16px 20px;
-      display: flex; align-items: center; gap: 16px; transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      background: #F8FAFC; border: 2px solid #E2E8F0; border-radius: 20px; padding: 16px;
+      display: flex; align-items: center; gap: 16px; transition: all 0.3s ease;
+      min-height: 90px;
     }
     
+    /* Trạng thái quét */
     .info-box.scanning { background: #EEF2FF; border-color: #C7D2FE; box-shadow: 0 8px 16px rgba(99, 102, 241, 0.1); }
-    .info-box.scanning .info-icon { background: #6366F1; color: #fff; box-shadow: 0 0 15px rgba(99, 102, 241, 0.4); }
-    
+    .info-box.scanning .info-visual { background: #6366F1; box-shadow: 0 0 15px rgba(99, 102, 241, 0.4); }
+    .info-box.scanning .info-subtitle { color: #6366F1; }
+
+    /* Trạng thái thành công */
     .info-box.success { background: #ECFDF5; border-color: #A7F3D0; box-shadow: 0 8px 16px rgba(16, 185, 129, 0.1); }
-    .info-box.success .info-icon { background: #10B981; color: #fff; box-shadow: 0 0 15px rgba(16, 185, 129, 0.4); }
-    
+    .info-box.success .info-visual { background: #10B981; border: 2px solid #34D399; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3); }
+    .info-box.success .info-subtitle { color: #10B981; }
+
+    /* Trạng thái lỗi/người lạ */
     .info-box.danger { background: #FFF1F2; border-color: #FECDD3; box-shadow: 0 8px 16px rgba(244, 63, 94, 0.1); }
-    .info-box.danger .info-icon { background: #F43F5E; color: #fff; box-shadow: 0 0 15px rgba(244, 63, 94, 0.4); }
+    .info-box.danger .info-visual { background: #F43F5E; box-shadow: 0 0 15px rgba(244, 63, 94, 0.4); }
+    .info-box.danger .info-subtitle { color: #F43F5E; }
 
-    .info-icon {
-      width: 48px; height: 48px; background: #94A3B8; color: #fff; border-radius: 14px;
-      display: flex; align-items: center; justify-content: center; font-size: 1.4rem; transition: all 0.3s;
+    /* Vùng chứa Icon hoặc Ảnh đại diện */
+    .info-visual {
+      width: 60px; height: 60px; flex-shrink: 0; background: #94A3B8; 
+      border-radius: 16px; overflow: hidden; display: flex; align-items: center; justify-content: center;
+      transition: all 0.3s; position: relative;
     }
+    .info-icon { color: #fff; font-size: 1.6rem; z-index: 2; }
+    .info-avatar { width: 100%; height: 100%; object-fit: cover; z-index: 3; position: absolute; top: 0; left: 0; }
 
-    .info-content { display: flex; flex-direction: column; gap: 4px; flex: 1; }
-    .info-title { font-size: 0.75rem; text-transform: uppercase; color: #64748B; font-weight: 700; letter-spacing: 0.5px; }
-    .info-text { font-size: 1rem; font-weight: 800; color: #0F172A; }
+    /* Chi tiết Tên và ID */
+    .info-content { display: flex; flex-direction: column; gap: 2px; flex: 1; overflow: hidden; }
+    .info-subtitle { font-size: 0.8rem; text-transform: uppercase; color: #64748B; font-weight: 800; letter-spacing: 0.5px; }
+    .info-title { font-size: 1.1rem; font-weight: 800; color: #0F172A; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
   </style>
 </head>
 <body>
@@ -113,17 +121,22 @@
       <video id="video" autoplay muted playsinline></video>
     </div>
 
+    <!-- Hộp thông tin (Profile Card) -->
     <div id="info-box" class="info-box">
-      <div id="info-icon" class="info-icon">⏳</div>
+      <div id="info-visual" class="info-visual">
+        <div id="info-icon" class="info-icon">⏳</div>
+        <!-- Ảnh sẽ tự động hiện ra đè lên icon khi nhận diện đúng -->
+        <img id="info-avatar" class="info-avatar" src="" alt="Avatar" style="display: none;">
+      </div>
       <div class="info-content">
-        <span class="info-title">Trạng thái</span>
-        <span id="info-text" class="info-text">Đang khởi tạo AI...</span>
+        <span id="info-subtitle" class="info-subtitle">Hệ Thống</span>
+        <span id="info-title" class="info-title">Đang khởi tạo AI...</span>
       </div>
     </div>
   </div>
 
   <script>
-    // ⚠️ HÃY CHẮC CHẮN ĐÂY LÀ LINK GOOGLE APPS SCRIPT CỦA BẠN (Cùng link với trang register)
+    // ⚠️ Đảm bảo nhập đúng link Apps Script của bạn
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzLFwJo3omYl1N7nyqCD5Lq7GJzGc4dCWrpUYWg7IgGiu6e-Budpn4aGrySBEvvPcCI/exec"; 
     
     let faceMatcher = null; 
@@ -132,6 +145,10 @@
     let currentFacingMode = "user"; 
     let currentStream = null;
     let isRunning = false;
+    
+    // Lưu trữ thông tin nhân viên (Tên, Ảnh) theo ID
+    const employeeData = {};
+    let lastScanLabel = ""; // Biến chống giật để không cập nhật giao diện liên tục nếu kết quả không đổi
 
     const video = document.getElementById('video');
     const container = document.getElementById('container');
@@ -139,26 +156,47 @@
     
     const infoBox = document.getElementById('info-box');
     const infoIcon = document.getElementById('info-icon');
-    const infoText = document.getElementById('info-text');
+    const infoAvatar = document.getElementById('info-avatar');
+    const infoTitle = document.getElementById('info-title');
+    const infoSubtitle = document.getElementById('info-subtitle');
 
-    function updateStatusUI(state, icon, text) {
-      infoIcon.innerText = icon;
-      infoText.innerText = text;
+    // Thuật toán chuyển link Drive thông thường thành link ảnh trực tiếp
+    function getDirectImageUrl(url) {
+      if (!url) return '';
+      const match = url.match(/\/d\/([a-zA-Z0-9-_]+)/);
+      return match ? `https://drive.google.com/uc?id=${match[1]}` : url;
+    }
+
+    // Cập nhật giao diện thẻ Profile
+    function updateStatusUI(state, icon, title, subtitle, avatarUrl = null) {
+      infoTitle.innerText = title;
+      infoSubtitle.innerText = subtitle;
+      
       infoBox.classList.remove('scanning', 'success', 'danger');
       if (state) infoBox.classList.add(state);
+
+      if (avatarUrl) {
+        infoIcon.style.display = 'none';
+        infoAvatar.src = getDirectImageUrl(avatarUrl);
+        infoAvatar.style.display = 'block';
+      } else {
+        infoAvatar.style.display = 'none';
+        infoIcon.innerText = icon;
+        infoIcon.style.display = 'block';
+      }
     }
 
     async function loadModels() {
       const MODEL_URL = 'https://justadudewhohacks.github.io/face-api.js/models';
       try {
-        updateStatusUI('', '⏳', 'Đang tải AI...');
+        updateStatusUI('', '⏳', 'Đang tải AI...', 'Hệ Thống');
         await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
         await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
         await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
         
         startCamera(currentFacingMode);
       } catch (e) {
-        updateStatusUI('danger', '❌', 'Lỗi mạng: Không thể tải AI');
+        updateStatusUI('danger', '❌', 'Không thể tải AI', 'Lỗi Mạng');
       }
     }
 
@@ -166,15 +204,10 @@
       isRunning = false;
       scanLine.style.display = 'none';
 
-      if (currentStream) {
-        currentStream.getTracks().forEach(track => track.stop());
-      }
+      if (currentStream) currentStream.getTracks().forEach(track => track.stop());
 
       try {
-        const constraints = {
-          video: { width: { ideal: 720 }, height: { ideal: 960 }, facingMode: facingMode }
-        };
-        
+        const constraints = { video: { width: { ideal: 720 }, height: { ideal: 960 }, facingMode: facingMode } };
         currentStream = await navigator.mediaDevices.getUserMedia(constraints);
         video.srcObject = currentStream;
 
@@ -193,7 +226,6 @@
             canvas = faceapi.createCanvasFromMedia(video);
             container.append(canvas);
           }
-          
           displaySize = { width: video.videoWidth, height: video.videoHeight };
           faceapi.matchDimensions(canvas, displaySize);
 
@@ -204,7 +236,7 @@
           }
         };
       } catch (err) {
-        updateStatusUI('danger', '📷', 'Vui lòng cấp quyền Camera');
+        updateStatusUI('danger', '📷', 'Vui lòng cấp quyền', 'Lỗi Camera');
       }
     }
 
@@ -215,7 +247,7 @@
 
     async function loadDataFromAppsScript() {
       try {
-        updateStatusUI('', '🔄', 'Đang tải dữ liệu...');
+        updateStatusUI('', '🔄', 'Đang tải dữ liệu...', 'Đồng Bộ');
         const response = await fetch(SCRIPT_URL);
         const result = await response.json();
         
@@ -225,20 +257,23 @@
           for (let i = 0; i < result.data.length; i++) {
             const row = result.data[i];
             
-            // 🚀 ĐÃ CẬP NHẬT CỘT: row[0]=ID, row[1]=Thời gian, row[2]=Tên, row[3]=FaceData, row[4]=Link Ảnh
+            // Lấy 5 trường dữ liệu từ Sheets
             const empId = row[0];
             const empName = row[2]; 
             const rawFaceData = row[3]; 
+            const empImage = row[4]; 
             
             if (!empId || !rawFaceData) continue;
             
+            // Lưu Tên và Ảnh vào bộ nhớ tạm bằng ID
+            employeeData[empId] = { name: empName, image: empImage };
+
             try {
               const parsedArray = typeof rawFaceData === 'string' ? JSON.parse(rawFaceData) : rawFaceData;
               if (Array.isArray(parsedArray) && parsedArray.length > 0) {
                 const descriptor = new Float32Array(parsedArray);
-                labeledFaceDescriptors.push(
-                  new faceapi.LabeledFaceDescriptors(`${empId} - ${empName}`, [descriptor])
-                );
+                // Đăng ký AI với nhãn chỉ là empId (Để lúc quét xong ta dùng ID gọi Tên & Ảnh ra)
+                labeledFaceDescriptors.push(new faceapi.LabeledFaceDescriptors(String(empId), [descriptor]));
               }
             } catch (err) {
               console.error("Lỗi parse dữ liệu:", err);
@@ -246,22 +281,21 @@
           }
 
           if (labeledFaceDescriptors.length > 0) {
-            // 🛑 NGƯỠNG BẢO MẬT CAO 0.45 CHỐNG NHẬN NHẦM
             faceMatcher = new faceapi.FaceMatcher(labeledFaceDescriptors, 0.45);
             startSmoothRecognition();
           } else {
-            updateStatusUI('danger', '⚠️', 'Chưa có nhân sự trên Sheets');
+            updateStatusUI('danger', '⚠️', 'Chưa có nhân sự', 'Cảnh Báo');
           }
         }
       } catch (error) {
-        updateStatusUI('danger', '🔌', 'Lỗi kết nối máy chủ');
+        updateStatusUI('danger', '🔌', 'Lỗi kết nối máy chủ', 'Hệ Thống');
       }
     }
 
     async function startSmoothRecognition() {
       isRunning = true;
       scanLine.style.display = 'block'; 
-      updateStatusUI('scanning', '🎯', 'Đang quét khuôn mặt...');
+      updateStatusUI('scanning', '🎯', 'Đang quét khuôn mặt...', 'Sẵn Sàng');
 
       const options = new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 });
       const ctx = canvas.getContext('2d');
@@ -270,51 +304,51 @@
         if (!isRunning || video.paused || video.ended || !faceMatcher) return;
 
         try {
-          const detection = await faceapi.detectSingleFace(video, options)
-            .withFaceLandmarks()
-            .withFaceDescriptor();
-
+          const detection = await faceapi.detectSingleFace(video, options).withFaceLandmarks().withFaceDescriptor();
           ctx.clearRect(0, 0, canvas.width, canvas.height);
 
           if (!detection) {
-            updateStatusUI('scanning', '🎯', 'Đang quét khuôn mặt...');
+            // Chỉ cập nhật nếu trạng thái trước đó khác "scanning"
+            if (lastScanLabel !== "scanning") {
+              updateStatusUI('scanning', '🎯', 'Đang quét khuôn mặt...', 'Sẵn Sàng');
+              lastScanLabel = "scanning";
+            }
           } else {
             const resizedDetection = faceapi.resizeResults(detection, displaySize);
             const bestMatch = faceMatcher.findBestMatch(resizedDetection.descriptor);
             const box = resizedDetection.detection.box;
-
             const isStranger = bestMatch.label === "unknown";
-            const boxColor = isStranger ? "#F43F5E" : "#10B981"; 
-            
-            // Cắt chuỗi chỉ lấy Tên (bỏ ID đi cho đẹp giao diện hiển thị)
-            const labelText = isStranger ? "Người lạ" : bestMatch.label.split(' - ')[1] || bestMatch.label;
 
+            // VẼ KHUNG TRÊN CAMERA
             const drawBox = new faceapi.draw.DrawBox(box, {
-              label: labelText,
-              boxColor: boxColor,
+              label: isStranger ? "Khách" : employeeData[bestMatch.label].name,
+              boxColor: isStranger ? "#F43F5E" : "#10B981",
               lineWidth: 3,
               drawLabelOptions: {
-                backgroundColor: boxColor,
-                fontColor: '#FFFFFF',
-                fontSize: 16,
-                padding: 10
+                backgroundColor: isStranger ? "#F43F5E" : "#10B981",
+                fontColor: '#FFFFFF', fontSize: 16, padding: 10
               }
             });
             drawBox.draw(canvas);
 
-            if (isStranger) {
-              updateStatusUI('danger', '🚫', 'Người lạ (Chưa đăng ký)');
-            } else {
-              updateStatusUI('success', '✅', `Xin chào: ${labelText}`);
+            // CẬP NHẬT THẺ PROFILE PHÍA DƯỚI (Chỉ cập nhật khi ID thay đổi để chống giật)
+            if (lastScanLabel !== bestMatch.label) {
+              lastScanLabel = bestMatch.label;
+
+              if (isStranger) {
+                updateStatusUI('danger', '🚫', 'Người lạ', 'Cảnh Báo (Chưa đăng ký)');
+              } else {
+                const emp = employeeData[bestMatch.label];
+                // Gọi hàm update hiển thị Tên, Mã ID và Link ảnh lấy từ Sheets
+                updateStatusUI('success', '✅', emp.name, `Mã ID: ${bestMatch.label}`, emp.image);
+              }
             }
           }
         } catch (err) {
           console.error("Lỗi AI:", err);
         }
 
-        if (isRunning) {
-          requestAnimationFrame(detectFrame);
-        }
+        if (isRunning) requestAnimationFrame(detectFrame);
       };
 
       detectFrame();
