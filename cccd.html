@@ -4,8 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>CCCD Scanner eKYC</title>
-    <!-- Thư viện quét mã QR -->
-    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
     <style>
         * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         body { 
@@ -29,13 +27,16 @@
             overflow: hidden; border-radius: 12px; display: none; background: #000;
         }
         #video { width: 100%; display: block; }
+        
+        /* Khung ngắm tự động cắt viền */
         .guide-overlay {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            width: 85%; aspect-ratio: 85.6 / 53.98;
+            width: 85%; aspect-ratio: 85.6 / 53.98; /* Tỉ lệ thẻ CCCD chuẩn */
             border: 2px dashed #00d2ff; border-radius: 14px;
             box-shadow: 0 0 0 2000px rgba(0,0,0,0.75);
             pointer-events: none; transition: border-color 0.3s;
         }
+        
         #flashEffect {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: white; opacity: 0; pointer-events: none;
@@ -77,13 +78,15 @@
 <body>
 
     <div class="glass-panel">
-        <h2 style="margin-top:0; color: #fff;">Xác Thực CCCD</h2>
+        <h2 style="margin-top:0; color: #fff;">Quét CCCD eKYC</h2>
         <div id="instruction">Nhấn "Bật Camera" để bắt đầu</div>
         
         <button id="btnStartCamera">Bật Camera</button>
 
         <div id="camera-container">
+            <!-- Camera hiển thị tại đây -->
             <video id="video" autoplay playsinline></video>
+            <!-- Khung định vị giới hạn vùng cắt -->
             <div class="guide-overlay" id="guide"></div>
             <div id="flashEffect"></div>
         </div>
@@ -98,17 +101,14 @@
         </div>
 
         <div class="data-card" id="dataCard">
-            <div style="margin-bottom: 5px;">Họ tên: <b id="outName" style="color:#facc15"></b></div>
-            <div style="margin-bottom: 5px;">Số CCCD: <b id="outCccdNum"></b></div>
-            <hr style="border: 0; border-top: 1px solid rgba(255,255,255,0.1); margin: 10px 0;">
-            <div style="margin-bottom: 5px;">Mã Giao Dịch: <b id="outId"></b></div>
+            <div style="margin-bottom: 5px;">Mã Hồ Sơ: <b id="outId"></b></div>
             <div>Thời gian: <b id="outTime"></b></div>
             <a href="#" id="outUrl" target="_blank">🔗 Mở Bản In A4</a>
         </div>
     </div>
 
     <script>
-        // URL Apps Script của bạn
+        // URL Apps Script của bạn giữ nguyên
         const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw75f616BH-U49XkdmJ4OIyhcxaiC6L24VqcdxkQnY2ZE9VYOcfjN2Nams2jyIGGznoeg/exec"; 
         
         const video = document.getElementById('video');
@@ -122,6 +122,7 @@
         let stream = null;
         let step = 1; 
 
+        // Khởi động Camera
         document.getElementById('btnStartCamera').addEventListener('click', async () => {
             try {
                 stream = await navigator.mediaDevices.getUserMedia({ 
@@ -132,17 +133,19 @@
                 document.getElementById('btnStartCamera').style.display = 'none';
                 
                 btnMainAction.style.display = 'block';
-                instruction.innerHTML = "Căn <span style='color:#00d2ff'>MẶT TRƯỚC</span> (có mã QR) vào khung";
+                instruction.innerHTML = "Căn <span style='color:#00d2ff'>MẶT TRƯỚC</span> vừa khít vào khung";
             } catch (err) {
                 alert("Vui lòng cấp quyền Camera trên trình duyệt!");
             }
         });
 
+        // Hiệu ứng Flash
         function flash() {
             flashEffect.style.opacity = '1';
             setTimeout(() => { flashEffect.style.opacity = '0'; }, 150);
         }
 
+        // Tự động cắt (Auto Crop) chính xác những gì nằm trong khung đứt nét
         function captureAndCrop(canvasId) {
             const videoRect = video.getBoundingClientRect();
             const guideRect = guide.getBoundingClientRect();
@@ -150,6 +153,7 @@
             const scaleX = video.videoWidth / videoRect.width;
             const scaleY = video.videoHeight / videoRect.height;
 
+            // Xác định tọa độ cắt loại bỏ nền thừa
             const cropX = (guideRect.left - videoRect.left) * scaleX;
             const cropY = (guideRect.top - videoRect.top) * scaleY;
             const cropW = guideRect.width * scaleX;
@@ -159,7 +163,7 @@
             canvas.width = 856; 
             canvas.height = 540; 
             const ctx = canvas.getContext('2d');
-            const cornerRadius = 35; 
+            const cornerRadius = 35; // Bo tròn góc thẻ CCCD
             
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.beginPath();
@@ -175,60 +179,36 @@
             ctx.closePath();
             
             ctx.clip();
+            // Lấy ảnh cắt ra dán vào Canvas
             ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, canvas.width, canvas.height);
         }
 
+        // Luồng xử lý bấm chụp không cần QR
         btnMainAction.addEventListener('click', () => {
             if (step === 1) {
                 flash();
-                captureAndCrop('canvasFront');
+                captureAndCrop('canvasFront'); // Cắt ngay lập tức
                 
-                // === XÁC THỰC MÃ QR CCCD ===
-                const canvas = document.getElementById('canvasFront');
-                const ctx = canvas.getContext('2d');
-                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                
-                // Quét QR từ dữ liệu hình ảnh
-                const qrCode = jsQR(imageData.data, imageData.width, imageData.height);
-                
-                if (qrCode) {
-                    const qrData = qrCode.data;
-                    // Mã QR của Bộ Công An chứa ký tự "|" phân tách dữ liệu
-                    if (qrData.includes('|')) {
-                        const cccdInfo = qrData.split('|');
-                        // Hiển thị tạm tên lên UI
-                        document.getElementById('outCccdNum').innerText = cccdInfo[0]; // Số CCCD
-                        document.getElementById('outName').innerText = cccdInfo[2];    // Họ tên
-
-                        alert(`✅ Xác thực thành công!\nHọ tên: ${cccdInfo[2]}\nSố CCCD: ${cccdInfo[0]}`);
-                        
-                        document.getElementById('results').style.display = 'flex';
-                        step = 2; 
-                        guide.style.borderColor = "#38ef7d";
-                        instruction.innerHTML = "Lật sang <span style='color:#38ef7d'>MẶT SAU</span>";
-                        btnMainAction.innerHTML = "📸 CHỤP MẶT SAU";
-                    } else {
-                        alert("❌ Có mã QR nhưng KHÔNG PHẢI CCCD Việt Nam!");
-                        ctx.clearRect(0, 0, canvas.width, canvas.height);
-                    }
-                } else {
-                    alert("❌ Không tìm thấy mã QR! Vui lòng để thẻ ngay ngắn, lau sạch ống kính và chụp nét hơn.");
-                    ctx.clearRect(0, 0, canvas.width, canvas.height);
-                }
+                document.getElementById('results').style.display = 'flex';
+                step = 2; 
+                guide.style.borderColor = "#38ef7d";
+                instruction.innerHTML = "Lật sang <span style='color:#38ef7d'>MẶT SAU</span>";
+                btnMainAction.innerHTML = "📸 CHỤP MẶT SAU";
                 
             } else if (step === 2) {
                 flash();
-                captureAndCrop('canvasBack');
+                captureAndCrop('canvasBack'); // Cắt ngay lập tức
                 
-                stream.getTracks().forEach(track => track.stop());
+                stream.getTracks().forEach(track => track.stop()); // Tắt camera
                 cameraContainer.style.display = 'none';
                 btnMainAction.style.display = 'none';
-                instruction.innerHTML = "🎉 Xử lý thành công!";
+                instruction.innerHTML = "🎉 Đang tạo A4 và lưu dữ liệu!";
                 
                 processAndUpload();
             }
         });
 
+        // Ghép A4 và Tải lên Drive
         async function processAndUpload() {
             document.getElementById('statusText').style.display = 'block';
 
@@ -266,6 +246,7 @@
 
                 if (result.status === 'success') {
                     dataCard.style.display = 'block';
+                    instruction.innerHTML = "✅ Xong! Hệ thống đã lưu thành công.";
                     document.getElementById('outId').innerText = result.id;
                     document.getElementById('outTime').innerText = result.time;
                     document.getElementById('outUrl').href = result.url;
