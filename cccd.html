@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>CCCD Scanner Pro</title>
+    <style>
+        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { 
+            background: linear-gradient(135deg, #131417, #1e2024, #272a2f); 
+            color: #e8eaed; min-height: 100vh; margin: 0; padding: 20px;
+            display: flex; flex-direction: column; align-items: center;
+        }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            padding: 24px; width: 100%; max-width: 500px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            text-align: center;
+        }
+        
+        #camera-container {
+            position: relative; width: 100%; margin: 0 auto 20px auto; 
+            overflow: hidden; border-radius: 12px; display: none; background: #000;
+        }
+        #video { width: 100%; display: block; }
+        .guide-overlay {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 85%; aspect-ratio: 85.6 / 53.98; /* Tỉ lệ chuẩn CCCD */
+            border: 2px dashed #00d2ff; border-radius: 14px;
+            box-shadow: 0 0 0 2000px rgba(0,0,0,0.7);
+            pointer-events: none; transition: border-color 0.3s;
+        }
+        #flashEffect {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: white; opacity: 0; pointer-events: none;
+            transition: opacity 0.1s ease-out; z-index: 10;
+        }
+
+        button {
+            width: 100%; padding: 16px; border-radius: 12px; font-weight: 600; font-size: 16px;
+            background: linear-gradient(135deg, #00d2ff, #3a7bd5); color: #fff; 
+            border: none; cursor: pointer; transition: 0.3s; margin-bottom: 15px;
+            box-shadow: 0 4px 15px rgba(0, 210, 255, 0.2);
+        }
+        button:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0, 210, 255, 0.4); }
+        .btn-capture { background: linear-gradient(135deg, #11998e, #38ef7d); display: none; box-shadow: 0 4px 15px rgba(56, 239, 125, 0.2);}
+        .btn-capture:hover { box-shadow: 0 6px 20px rgba(56, 239, 125, 0.4); }
+        
+        .result-container { display: flex; justify-content: space-around; gap: 10px; margin-top: 15px; }
+        .result-item { flex: 1; text-align: center; font-size: 12px; color: #a1a1aa; }
+        .result-item canvas { 
+            width: 100%; max-width: 200px; margin-top: 8px;
+            border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; 
+        }
+
+        #instruction { font-size: 17px; font-weight: 500; color: #facc15; margin-bottom: 20px; min-height: 25px;}
+        .loader { display: none; margin-top: 10px; font-weight: 500; color: #38ef7d; }
+        .data-card {
+            background: rgba(0,0,0,0.2); border-radius: 10px; padding: 15px;
+            margin-top: 20px; text-align: left; font-size: 14px; color: #cbd5e1;
+            border: 1px solid rgba(255,255,255,0.05); display: none;
+        }
+        .data-card b { color: #fff; }
+        .data-card a { 
+            display: block; text-align: center; margin-top: 15px; padding: 10px;
+            background: rgba(0, 210, 255, 0.1); color: #00d2ff; text-decoration: none;
+            border-radius: 6px; border: 1px solid rgba(0, 210, 255, 0.3); font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="glass-panel">
+        <h2 style="margin-top:0; color: #fff;">Quét CCCD eKYC</h2>
+        <div id="instruction">Nhấn "Bật Camera" để bắt đầu</div>
+        
+        <button id="btnStartCamera">Bật Camera</button>
+
+        <div id="camera-container">
+            <video id="video" autoplay playsinline></video>
+            <div class="guide-overlay" id="guide"></div>
+            <div id="flashEffect"></div>
+        </div>
+
+        <button class="btn-capture" id="btnMainAction">📸 CHỤP MẶT TRƯỚC</button>
+        
+        <div class="loader" id="statusText">⏳ Đang xử lý và đồng bộ dữ liệu...</div>
+
+        <div class="result-container" id="results" style="display: none;">
+            <div class="result-item">Mặt Trước<br><canvas id="canvasFront"></canvas></div>
+            <div class="result-item">Mặt Sau<br><canvas id="canvasBack"></canvas></div>
+        </div>
+
+        <!-- Khung hiển thị dữ liệu trả về từ Apps Script -->
+        <div class="data-card" id="dataCard">
+            <div style="margin-bottom: 5px;">Mã Hồ Sơ: <b id="outId"></b></div>
+            <div>Thời gian: <b id="outTime"></b></div>
+            <a href="#" id="outUrl" target="_blank">🔗 Mở Bản In A4</a>
+        </div>
+    </div>
+
+    <script>
+        // URL WEB APP CỦA BẠN ĐÃ ĐƯỢC TÍCH HỢP
+        const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw75f616BH-U49XkdmJ4OIyhcxaiC6L24VqcdxkQnY2ZE9VYOcfjN2Nams2jyIGGznoeg/exec"; 
+        
+        const video = document.getElementById('video');
+        const cameraContainer = document.getElementById('camera-container');
+        const guide = document.getElementById('guide');
+        const btnMainAction = document.getElementById('btnMainAction');
+        const instruction = document.getElementById('instruction');
+        const flashEffect = document.getElementById('flashEffect');
+        const dataCard = document.getElementById('dataCard');
+        
+        let stream = null;
+        let step = 1; 
+
+        // Khởi động Camera (ưu tiên camera sau trên thiết bị di động)
+        document.getElementById('btnStartCamera').addEventListener('click', async () => {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } } 
+                });
+                video.srcObject = stream;
+                cameraContainer.style.display = 'block';
+                document.getElementById('btnStartCamera').style.display = 'none';
+                
+                btnMainAction.style.display = 'block';
+                instruction.innerHTML = "Căn <span style='color:#00d2ff'>MẶT TRƯỚC</span> vào khung";
+            } catch (err) {
+                alert("Vui lòng cấp quyền Camera trên trình duyệt!");
+            }
+        });
+
+        // Hiệu ứng nháy Flash
+        function flash() {
+            flashEffect.style.opacity = '1';
+            setTimeout(() => { flashEffect.style.opacity = '0'; }, 150);
+        }
+
+        // Cắt theo tọa độ khung ngắm và bo tròn góc
+        function captureAndCrop(canvasId) {
+            const videoRect = video.getBoundingClientRect();
+            const guideRect = guide.getBoundingClientRect();
+
+            const scaleX = video.videoWidth / videoRect.width;
+            const scaleY = video.videoHeight / videoRect.height;
+
+            const cropX = (guideRect.left - videoRect.left) * scaleX;
+            const cropY = (guideRect.top - videoRect.top) * scaleY;
+            const cropW = guideRect.width * scaleX;
+            const cropH = guideRect.height * scaleY;
+
+            const canvas = document.getElementById(canvasId);
+            canvas.width = 856; 
+            canvas.height = 540; 
+            const ctx = canvas.getContext('2d');
+            const cornerRadius = 35; // Độ cong của góc CCCD
+            
+            // Vẽ đường Path bo góc
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.beginPath();
+            ctx.moveTo(cornerRadius, 0);
+            ctx.lineTo(canvas.width - cornerRadius, 0);
+            ctx.quadraticCurveTo(canvas.width, 0, canvas.width, cornerRadius);
+            ctx.lineTo(canvas.width, canvas.height - cornerRadius);
+            ctx.quadraticCurveTo(canvas.width, canvas.height, canvas.width - cornerRadius, canvas.height);
+            ctx.lineTo(cornerRadius, canvas.height);
+            ctx.quadraticCurveTo(0, canvas.height, 0, canvas.height - cornerRadius);
+            ctx.lineTo(0, cornerRadius);
+            ctx.quadraticCurveTo(0, 0, cornerRadius, 0);
+            ctx.closePath();
+            
+            ctx.clip(); // Cắt bỏ những phần viền vuông ngoài đường Path bo góc
+            ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, canvas.width, canvas.height);
+        }
+
+        // Xử lý luồng bấm nút
+        btnMainAction.addEventListener('click', () => {
+            if (step === 1) {
+                flash();
+                captureAndCrop('canvasFront');
+                document.getElementById('results').style.display = 'flex';
+                
+                step = 2; // Chuyển sang bước chụp mặt sau
+                guide.style.borderColor = "#38ef7d";
+                instruction.innerHTML = "Lật sang <span style='color:#38ef7d'>MẶT SAU</span>";
+                btnMainAction.innerHTML = "📸 CHỤP MẶT SAU";
+                
+            } else if (step === 2) {
+                flash();
+                captureAndCrop('canvasBack');
+                
+                // Tắt Camera
+                stream.getTracks().forEach(track => track.stop());
+                cameraContainer.style.display = 'none';
+                btnMainAction.style.display = 'none';
+                instruction.innerHTML = "🎉 Xử lý thành công!";
+                
+                processAndUpload();
+            }
+        });
+
+        // Ghép A4 và Tải lên Drive
+        async function processAndUpload() {
+            document.getElementById('statusText').style.display = 'block';
+
+            const canvasA4 = document.createElement('canvas');
+            canvasA4.width = 794; canvasA4.height = 1123; // Chuẩn A4 ở 96 DPI
+            const ctx = canvasA4.getContext('2d');
+
+            // Nền trắng
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(0, 0, canvasA4.width, canvasA4.height);
+
+            const cFront = document.getElementById('canvasFront');
+            const cBack = document.getElementById('canvasBack');
+
+            const cardWidth = 500;
+            const cardHeight = cardWidth / (85.6/53.98);
+            const xOffset = (canvasA4.width - cardWidth) / 2;
+            
+            // Vẽ mặt trước và mặt sau lên A4 (Cách lề trên 150px, 2 mặt cách nhau 50px)
+            ctx.drawImage(cFront, xOffset, 150, cardWidth, cardHeight);
+            ctx.drawImage(cBack, xOffset, 150 + cardHeight + 50, cardWidth, cardHeight);
+
+            // Xuất ra Base64
+            const finalBase64 = canvasA4.toDataURL("image/png");
+            
+            try {
+                // Gọi tới Google Apps Script
+                const response = await fetch(APPS_SCRIPT_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        filename: "CCCD_" + new Date().getTime(),
+                        image: finalBase64
+                    }),
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' }
+                });
+                
+                const result = await response.json();
+                document.getElementById('statusText').style.display = 'none';
+
+                if (result.status === 'success') {
+                    // Hiển thị thông tin trả về
+                    dataCard.style.display = 'block';
+                    document.getElementById('outId').innerText = result.id;
+                    document.getElementById('outTime').innerText = result.time;
+                    document.getElementById('outUrl').href = result.url;
+                } else {
+                    alert("Lỗi Apps Script: " + result.message);
+                }
+            } catch (error) {
+                document.getElementById('statusText').style.display = 'none';
+                alert("Lỗi mạng, không thể kết nối tới máy chủ.");
+            }
+        }
+    </script>
+</body>
+</html>
