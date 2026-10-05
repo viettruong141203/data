@@ -69,24 +69,21 @@
     }
     .switch-btn:hover { background: rgba(255, 255, 255, 0.4); transform: scale(1.1) rotate(180deg); }
 
-    /* Hộp Thông Tin Phía Dưới - Thiết kế dạng Profile Card */
+    /* Hộp Thông Tin Phía Dưới */
     .info-box {
       background: #F8FAFC; border: 2px solid #E2E8F0; border-radius: 20px; padding: 16px;
       display: flex; align-items: center; gap: 16px; transition: all 0.3s ease;
       min-height: 90px;
     }
     
-    /* Trạng thái quét */
     .info-box.scanning { background: #EEF2FF; border-color: #C7D2FE; box-shadow: 0 8px 16px rgba(99, 102, 241, 0.1); }
     .info-box.scanning .info-visual { background: #6366F1; box-shadow: 0 0 15px rgba(99, 102, 241, 0.4); }
     .info-box.scanning .info-subtitle { color: #6366F1; }
 
-    /* Trạng thái thành công */
     .info-box.success { background: #ECFDF5; border-color: #A7F3D0; box-shadow: 0 8px 16px rgba(16, 185, 129, 0.1); }
     .info-box.success .info-visual { background: #10B981; border: 2px solid #34D399; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3); }
     .info-box.success .info-subtitle { color: #10B981; }
 
-    /* Trạng thái lỗi/người lạ */
     .info-box.danger { background: #FFF1F2; border-color: #FECDD3; box-shadow: 0 8px 16px rgba(244, 63, 94, 0.1); }
     .info-box.danger .info-visual { background: #F43F5E; box-shadow: 0 0 15px rgba(244, 63, 94, 0.4); }
     .info-box.danger .info-subtitle { color: #F43F5E; }
@@ -97,7 +94,7 @@
       border-radius: 16px; overflow: hidden; display: flex; align-items: center; justify-content: center;
       transition: all 0.3s; position: relative;
     }
-    .info-icon { color: #fff; font-size: 1.6rem; z-index: 2; }
+    .info-icon { color: #fff; font-size: 1.6rem; z-index: 2; display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; }
     .info-avatar { width: 100%; height: 100%; object-fit: cover; z-index: 3; position: absolute; top: 0; left: 0; }
 
     /* Chi tiết Tên và ID */
@@ -125,8 +122,8 @@
     <div id="info-box" class="info-box">
       <div id="info-visual" class="info-visual">
         <div id="info-icon" class="info-icon">⏳</div>
-        <!-- Ảnh sẽ tự động hiện ra đè lên icon khi nhận diện đúng -->
-        <img id="info-avatar" class="info-avatar" src="" alt="Avatar" style="display: none;">
+        <!-- Thêm sự kiện onerror để tự động hiện lại icon ✅ nếu ảnh Drive bị lỗi tải mạng -->
+        <img id="info-avatar" class="info-avatar" src="" alt="Avatar" style="display: none;" onerror="this.style.display='none'; document.getElementById('info-icon').style.display='flex';">
       </div>
       <div class="info-content">
         <span id="info-subtitle" class="info-subtitle">Hệ Thống</span>
@@ -146,9 +143,8 @@
     let currentStream = null;
     let isRunning = false;
     
-    // Lưu trữ thông tin nhân viên (Tên, Ảnh) theo ID
     const employeeData = {};
-    let lastScanLabel = ""; // Biến chống giật để không cập nhật giao diện liên tục nếu kết quả không đổi
+    let lastScanLabel = ""; 
 
     const video = document.getElementById('video');
     const container = document.getElementById('container');
@@ -160,14 +156,18 @@
     const infoTitle = document.getElementById('info-title');
     const infoSubtitle = document.getElementById('info-subtitle');
 
-    // Thuật toán chuyển link Drive thông thường thành link ảnh trực tiếp
+    // 🚀 ĐÃ CẬP NHẬT: Dùng Thumbnail API của Google Drive (Tránh bị Github Pages chặn hiển thị ảnh)
     function getDirectImageUrl(url) {
       if (!url) return '';
-      const match = url.match(/\/d\/([a-zA-Z0-9-_]+)/);
-      return match ? `https://drive.google.com/uc?id=${match[1]}` : url;
+      // Bắt đoạn mã ID dài ~33 ký tự trong link Drive
+      const match = url.match(/[-\w]{25,}/);
+      if (match) {
+        // Dùng API thumbnail lấy ảnh kích thước vuông, không bị chặn CORS
+        return `https://drive.google.com/thumbnail?id=${match[0]}&sz=w200-h200-c`;
+      }
+      return url;
     }
 
-    // Cập nhật giao diện thẻ Profile
     function updateStatusUI(state, icon, title, subtitle, avatarUrl = null) {
       infoTitle.innerText = title;
       infoSubtitle.innerText = subtitle;
@@ -182,7 +182,7 @@
       } else {
         infoAvatar.style.display = 'none';
         infoIcon.innerText = icon;
-        infoIcon.style.display = 'block';
+        infoIcon.style.display = 'flex';
       }
     }
 
@@ -257,7 +257,6 @@
           for (let i = 0; i < result.data.length; i++) {
             const row = result.data[i];
             
-            // Lấy 5 trường dữ liệu từ Sheets
             const empId = row[0];
             const empName = row[2]; 
             const rawFaceData = row[3]; 
@@ -265,14 +264,12 @@
             
             if (!empId || !rawFaceData) continue;
             
-            // Lưu Tên và Ảnh vào bộ nhớ tạm bằng ID
             employeeData[empId] = { name: empName, image: empImage };
 
             try {
               const parsedArray = typeof rawFaceData === 'string' ? JSON.parse(rawFaceData) : rawFaceData;
               if (Array.isArray(parsedArray) && parsedArray.length > 0) {
                 const descriptor = new Float32Array(parsedArray);
-                // Đăng ký AI với nhãn chỉ là empId (Để lúc quét xong ta dùng ID gọi Tên & Ảnh ra)
                 labeledFaceDescriptors.push(new faceapi.LabeledFaceDescriptors(String(empId), [descriptor]));
               }
             } catch (err) {
@@ -281,6 +278,7 @@
           }
 
           if (labeledFaceDescriptors.length > 0) {
+            // Ngưỡng bảo mật 0.45
             faceMatcher = new faceapi.FaceMatcher(labeledFaceDescriptors, 0.45);
             startSmoothRecognition();
           } else {
@@ -308,7 +306,6 @@
           ctx.clearRect(0, 0, canvas.width, canvas.height);
 
           if (!detection) {
-            // Chỉ cập nhật nếu trạng thái trước đó khác "scanning"
             if (lastScanLabel !== "scanning") {
               updateStatusUI('scanning', '🎯', 'Đang quét khuôn mặt...', 'Sẵn Sàng');
               lastScanLabel = "scanning";
@@ -319,7 +316,6 @@
             const box = resizedDetection.detection.box;
             const isStranger = bestMatch.label === "unknown";
 
-            // VẼ KHUNG TRÊN CAMERA
             const drawBox = new faceapi.draw.DrawBox(box, {
               label: isStranger ? "Khách" : employeeData[bestMatch.label].name,
               boxColor: isStranger ? "#F43F5E" : "#10B981",
@@ -331,7 +327,6 @@
             });
             drawBox.draw(canvas);
 
-            // CẬP NHẬT THẺ PROFILE PHÍA DƯỚI (Chỉ cập nhật khi ID thay đổi để chống giật)
             if (lastScanLabel !== bestMatch.label) {
               lastScanLabel = bestMatch.label;
 
@@ -339,7 +334,6 @@
                 updateStatusUI('danger', '🚫', 'Người lạ', 'Cảnh Báo (Chưa đăng ký)');
               } else {
                 const emp = employeeData[bestMatch.label];
-                // Gọi hàm update hiển thị Tên, Mã ID và Link ảnh lấy từ Sheets
                 updateStatusUI('success', '✅', emp.name, `Mã ID: ${bestMatch.label}`, emp.image);
               }
             }
