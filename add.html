@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Đăng Ký Nhân Sự</title>
+  <title>Face ID - Đăng Ký Nhân Sự</title>
   
   <script defer src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
@@ -19,8 +19,24 @@
 
     /* Khung chứa Camera & Ảnh xem trước */
     .view-container { position: relative; width: 100%; aspect-ratio: 1; border-radius: 20px; overflow: hidden; margin-bottom: 20px; background: #0F172A; border: 4px solid #6366F1; box-shadow: 0 10px 20px rgba(99, 102, 241, 0.2); }
-    #video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
-    #preview-img { width: 100%; height: 100%; object-fit: cover; display: none; } /* Ảnh xem trước ẩn đi mặc định */
+    
+    #video { width: 100%; height: 100%; object-fit: cover; display: block; }
+    /* Lật gương tự động khi dùng camera trước */
+    #video.front-camera { transform: scaleX(-1); }
+    #video.back-camera { transform: scaleX(1); }
+
+    /* Ảnh xem trước */
+    #preview-img { width: 100%; height: 100%; object-fit: cover; display: none; } 
+
+    /* Nút đổi camera tinh tế góc trên */
+    .switch-btn {
+      position: absolute; top: 12px; right: 12px; width: 40px; height: 40px;
+      background: rgba(255, 255, 255, 0.25); color: #FFFFFF; border: 1px solid rgba(255, 255, 255, 0.4);
+      border-radius: 50%; display: flex; align-items: center; justify-content: center;
+      font-size: 1.2rem; cursor: pointer; backdrop-filter: blur(10px); z-index: 10;
+      transition: all 0.3s ease; box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    .switch-btn:hover { background: rgba(255, 255, 255, 0.45); transform: scale(1.1) rotate(180deg); }
 
     /* Form nhập liệu */
     .input-group { text-align: left; margin-bottom: 15px; }
@@ -34,7 +50,7 @@
     .btn-capture:hover { background: #4F46E5; transform: translateY(-2px); }
     .btn-capture:disabled { background: #94A3B8; cursor: not-allowed; box-shadow: none; transform: none; }
     
-    .confirm-actions { display: none; gap: 10px; } /* Ẩn đi chờ chụp xong */
+    .confirm-actions { display: none; gap: 10px; } 
     .btn-retake { background: #F1F5F9; color: #475569; flex: 1; border: 2px solid #E2E8F0; }
     .btn-retake:hover { background: #E2E8F0; }
     .btn-save { background: #10B981; color: white; flex: 2; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3); }
@@ -53,9 +69,8 @@
     </div>
 
     <div class="view-container">
-      <!-- Camera trực tiếp -->
+      <button id="btnSwitch" class="switch-btn" onclick="switchCamera()" title="Đổi camera">🔄</button>
       <video id="video" autoplay muted playsinline></video>
-      <!-- Ảnh tĩnh hiện ra sau khi chụp -->
       <img id="preview-img" alt="Ảnh đã chụp">
     </div>
 
@@ -64,10 +79,8 @@
       <input type="text" id="empName" placeholder="Nhập họ và tên...">
     </div>
 
-    <!-- Nút Chụp Ảnh (Bước 1) -->
     <button id="btnCapture" class="btn btn-capture" onclick="captureAndAnalyze()" disabled>📸 Chụp Ảnh Phân Tích</button>
 
-    <!-- Nhóm Nút Xác Nhận (Bước 2 - Hiện ra sau khi phân tích OK) -->
     <div id="confirm-actions" class="confirm-actions">
       <button class="btn btn-retake" onclick="retakePhoto()">🔄 Chụp Lại</button>
       <button id="btnSave" class="btn btn-save" onclick="saveData()">✅ Lưu Thông Tin</button>
@@ -77,23 +90,25 @@
   </div>
 
   <script>
-    // ⚠️ CHÚ Ý: COPY LINK WEB APP MỚI CỦA BẠN DÁN VÀO ĐÂY (Sau khi Deploy New Version)
+    // ⚠️ CHÚ Ý: ĐẢM BẢO LINK DƯỚI ĐÂY LÀ LINK WEB APP CHUẨN CỦA BẠN
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzLFwJo3omYl1N7nyqCD5Lq7GJzGc4dCWrpUYWg7IgGiu6e-Budpn4aGrySBEvvPcCI/exec"; 
     
     let capturedDescriptor = null;
     let capturedImageBase64 = null;
     let currentStream = null;
+    let currentFacingMode = "user"; // Mặc định mở camera trước
 
     const video = document.getElementById('video');
     const previewImg = document.getElementById('preview-img');
     const statusTxt = document.getElementById('status');
+    const btnSwitch = document.getElementById('btnSwitch');
     
     const btnCapture = document.getElementById('btnCapture');
     const confirmActions = document.getElementById('confirm-actions');
     const btnSave = document.getElementById('btnSave');
     const inputName = document.getElementById('empName');
 
-    // 1. Tải AI & Bật Camera
+    // 1. Tải AI
     async function init() {
       const MODEL_URL = 'https://justadudewhohacks.github.io/face-api.js/models';
       try {
@@ -101,17 +116,30 @@
         await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
         await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
         
-        startCamera();
+        startCamera(currentFacingMode);
       } catch(e) {
         statusTxt.innerText = "Lỗi mạng: Không tải được AI!";
         statusTxt.style.color = "#EF4444";
       }
     }
 
-    async function startCamera() {
+    // 2. Mở Camera & Cài đặt hướng lật
+    async function startCamera(facingMode) {
+      if (currentStream) {
+        currentStream.getTracks().forEach(track => track.stop());
+      }
       try {
-        currentStream = await navigator.mediaDevices.getUserMedia({ video: { width: {ideal: 640}, height: {ideal: 640}, facingMode: "user" } });
+        const constraints = { video: { width: {ideal: 640}, height: {ideal: 640}, facingMode: facingMode } };
+        currentStream = await navigator.mediaDevices.getUserMedia(constraints);
         video.srcObject = currentStream;
+
+        // Xử lý CSS cho camera: Trước thì lật gương, Sau thì giữ nguyên
+        if (facingMode === "user") {
+          video.className = "front-camera";
+        } else {
+          video.className = "back-camera";
+        }
+
         video.onloadedmetadata = () => {
           video.play();
           btnCapture.disabled = false;
@@ -124,7 +152,13 @@
       }
     }
 
-    // 2. Chụp ảnh & AI quét khuôn mặt ngay trên ảnh vừa chụp
+    // Đổi camera
+    function switchCamera() {
+      currentFacingMode = (currentFacingMode === "user") ? "environment" : "user";
+      startCamera(currentFacingMode);
+    }
+
+    // 3. Chụp ảnh & AI quét
     async function captureAndAnalyze() {
       const name = inputName.value.trim();
       if (!name) return alert("Vui lòng nhập Họ và Tên trước khi chụp!");
@@ -133,35 +167,39 @@
       statusTxt.innerText = "⏳ Đang phân tích khuôn mặt...";
       statusTxt.style.color = "#F59E0B";
 
-      // Tạo canvas ảo để vẽ lại khung hình video hiện tại
+      // Tạo khung Canvas ảo để vẽ lại khung hình hiện tại
       const canvas = document.createElement('canvas');
       canvas.width = video.videoWidth; 
       canvas.height = video.videoHeight;
       const ctx = canvas.getContext('2d');
       
-      // Lật gương canvas để ảnh lưu ra giống với lúc người dùng soi gương
-      ctx.translate(canvas.width, 0); 
-      ctx.scale(-1, 1);
+      // Xử lý chống ngược chữ/ảnh khi lưu Drive: Nếu là camera trước thì lật lại cho đúng chiều gốc
+      if (currentFacingMode === "user") {
+        ctx.translate(canvas.width, 0); 
+        ctx.scale(-1, 1);
+      }
+      
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-      // Chạy AI nhận diện trên bức ảnh tĩnh vừa chụp
+      // Chạy AI nhận diện
       const options = new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 });
       const detection = await faceapi.detectSingleFace(canvas, options).withFaceLandmarks().withFaceDescriptor();
 
       if (!detection) {
-        alert("❌ KHÔNG ĐẠT: Không tìm thấy khuôn mặt đầy đủ. Vui lòng bỏ khẩu trang, kính râm, đưa mặt vào giữa và chụp lại!");
+        alert("❌ KHÔNG ĐẠT: Không tìm thấy khuôn mặt đầy đủ. Vui lòng thử lại!");
         statusTxt.innerText = "Thử lại! Hãy nhìn thẳng vào khung hình.";
         statusTxt.style.color = "#EF4444";
         btnCapture.disabled = false;
         return;
       }
 
-      // NẾU QUÉT THÀNH CÔNG: Lưu dữ liệu vào biến bộ nhớ
+      // NẾU THÀNH CÔNG
       capturedDescriptor = Array.from(detection.descriptor);
-      capturedImageBase64 = canvas.toDataURL('image/jpeg', 0.85); // Nén jpeg 85% cho nhẹ file upload drive
+      capturedImageBase64 = canvas.toDataURL('image/jpeg', 0.85);
 
-      // Chuyển UI sang màn hình Xem trước (Preview)
+      // Chuyển sang giao diện xem trước (Ẩn camera và nút đổi camera đi)
       video.style.display = 'none';
+      btnSwitch.style.display = 'none'; 
       previewImg.src = capturedImageBase64;
       previewImg.style.display = 'block';
 
@@ -172,13 +210,14 @@
       statusTxt.style.color = "#10B981";
     }
 
-    // 3. Nút "Chụp Lại" (Quay về camera)
+    // 4. Chụp lại
     function retakePhoto() {
       capturedDescriptor = null;
       capturedImageBase64 = null;
       
       previewImg.style.display = 'none';
       video.style.display = 'block';
+      btnSwitch.style.display = 'flex'; 
       
       confirmActions.style.display = 'none';
       btnCapture.style.display = 'flex';
@@ -188,13 +227,22 @@
       statusTxt.style.color = "#10B981";
     }
 
-    // 4. Bấm "Lưu Thông Tin" để gửi lên Apps Script
+    // 5. Lưu Thông Tin lên Sheets và Drive
     async function saveData() {
       btnSave.disabled = true;
       btnSave.innerText = "⏳ Đang đẩy lên máy chủ...";
       statusTxt.innerText = "Đang lưu hình ảnh vào Drive...";
 
-      const timeWeb = new Date().toLocaleString('vi-VN');
+      // ĐỊNH DẠNG THỜI GIAN CHUẨN YÊU CẦU: "hh:mm:ss dd/mm/yyyy"
+      const now = new Date();
+      const hh = String(now.getHours()).padStart(2, '0');
+      const mm = String(now.getMinutes()).padStart(2, '0');
+      const ss = String(now.getSeconds()).padStart(2, '0');
+      const dd = String(now.getDate()).padStart(2, '0');
+      const mo = String(now.getMonth() + 1).padStart(2, '0'); // Tháng của JS chạy từ 0-11
+      const yyyy = now.getFullYear();
+      const timeWeb = `${hh}:${mm}:${ss} ${dd}/${mo}/${yyyy}`;
+
       const payload = {
         name: inputName.value.trim(),
         faceData: JSON.stringify(capturedDescriptor),
@@ -210,9 +258,9 @@
         const res = await response.json();
         
         if (res.status === "success") {
-          alert("🎉 " + res.message); // Hiển thị mã NV
+          alert("🎉 " + res.message); 
           inputName.value = "";
-          retakePhoto(); // Reset lại toàn bộ màn hình chụp
+          retakePhoto();
         } else {
           alert("Lỗi server: " + res.message);
           btnSave.disabled = false;
