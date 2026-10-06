@@ -1,396 +1,302 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Face ID</title>
-    <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;600;700&display=swap" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.min.js"></script>
-    <style>
-        :root {
-            --primary: #00bfa5;
-            --bg-gradient: linear-gradient(135deg, #e4c1f9 0%, #a9def9 100%);
-            --card-bg: #ffffff;
-            --result-bg: #eaffea;
-            --result-border: #b2ebb4;
-            --text-dark: #1a1a1a;
-        }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Face ID - Check In (High Accuracy)</title>
+  
+  <script defer src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Quicksand', sans-serif; }
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', sans-serif; }
+    
+    body, html {
+      width: 100%; height: 100%;
+      background: linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%);
+      display: flex; justify-content: center; align-items: center; padding: 15px;
+    }
 
-        body {
-            background: var(--bg-gradient);
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 20px;
-        }
+    .app-card {
+      background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(20px);
+      padding: 16px; border-radius: 32px;
+      box-shadow: 0 24px 48px rgba(0, 0, 0, 0.1), inset 0 0 0 1px rgba(255, 255, 255, 0.5);
+      width: 100%; max-width: 480px; display: flex; flex-direction: column; gap: 16px;
+    }
 
-        .main-card {
-            background: var(--card-bg);
-            border-radius: 24px;
-            padding: 16px;
-            width: 100%;
-            max-width: 420px;
-            box-shadow: 0 15px 35px rgba(0,0,0,0.1);
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
-        }
+    .camera-container {
+      position: relative; width: 100%; aspect-ratio: 3 / 4; 
+      background: #0F172A; border-radius: 24px; overflow: hidden;
+      box-shadow: 0 12px 24px rgba(0,0,0,0.15); border: 4px solid #FFFFFF;
+    }
 
-        .scanner-container {
-            position: relative;
-            width: 100%;
-            aspect-ratio: 3/4;
-            border-radius: 16px;
-            overflow: hidden;
-            background: #000;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
+    #video { width: 100%; height: 100%; object-fit: cover; display: block; }
+    #video.front-camera { transform: scaleX(-1); }
+    #video.back-camera { transform: scaleX(1); }
 
-        video { 
-            width: 100%; height: 100%; 
-            object-fit: cover; display: block; 
-        }
+    canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+    canvas.front-camera { transform: scaleX(-1); }
+    canvas.back-camera { transform: scaleX(1); }
 
-        canvas {
-            position: absolute;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            z-index: 10;
-        }
+    .scan-line {
+      position: absolute; width: 100%; height: 4px;
+      background: linear-gradient(90deg, transparent, rgba(99, 102, 241, 0.8), transparent);
+      box-shadow: 0 0 15px rgba(99, 102, 241, 0.8);
+      top: 0; left: 0; animation: scan 2s infinite linear; z-index: 5; display: none;
+    }
+    @keyframes scan { 0% { top: 0%; opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { top: 100%; opacity: 0; } }
 
-        .mirror {
-            transform: scaleX(-1);
-            -webkit-transform: scaleX(-1);
-        }
+    .icon-btn {
+      position: absolute; top: 16px; right: 16px; width: 46px; height: 46px;
+      background: rgba(0, 0, 0, 0.3); color: #FFFFFF; border: 1px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%; display: flex; align-items: center; justify-content: center;
+      cursor: pointer; backdrop-filter: blur(10px); z-index: 10;
+      transition: all 0.3s ease; box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+    .icon-btn:hover { background: rgba(0, 0, 0, 0.5); transform: scale(1.05) rotate(180deg); }
+    .icon-btn svg { width: 22px; height: 22px; stroke: currentColor; }
 
-        #status-msg {
-            position: absolute;
-            z-index: 20;
-            background: rgba(0, 0, 0, 0.75);
-            color: #fff;
-            padding: 12px 24px;
-            border-radius: 30px;
-            font-size: 14px;
-            font-weight: 600;
-            text-align: center;
-            backdrop-filter: blur(4px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-            max-width: 80%;
-        }
+    .info-box {
+      background: #F8FAFC; border: 2px solid #E2E8F0; border-radius: 20px; padding: 16px;
+      display: flex; align-items: center; gap: 16px; transition: all 0.3s ease; min-height: 90px;
+    }
+    
+    .info-box.scanning { background: #EEF2FF; border-color: #C7D2FE; box-shadow: 0 8px 16px rgba(99, 102, 241, 0.1); }
+    .info-box.scanning .info-visual { background: #6366F1; box-shadow: 0 0 15px rgba(99, 102, 241, 0.4); }
+    .info-box.scanning .info-subtitle { color: #6366F1; }
 
-        .camera-btn {
-            position: absolute; top: 12px; right: 12px;
-            width: 40px; height: 40px;
-            background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(4px);
-            border-radius: 50%;
-            display: flex; justify-content: center; align-items: center;
-            z-index: 25; border: none; cursor: pointer; color: white;
-        }
+    .info-box.success { background: #ECFDF5; border-color: #A7F3D0; box-shadow: 0 8px 16px rgba(16, 185, 129, 0.1); }
+    .info-box.success .info-visual { background: #10B981; border: 2px solid #34D399; }
+    .info-box.success .info-subtitle { color: #10B981; }
 
-        .result-wrapper {
-            min-height: 80px; 
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
+    .info-visual {
+      width: 60px; height: 60px; flex-shrink: 0; background: #94A3B8; 
+      border-radius: 16px; overflow: hidden; display: flex; align-items: center; justify-content: center; position: relative;
+    }
+    .info-icon { color: #fff; font-size: 1.6rem; z-index: 2; display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; }
+    .info-avatar { width: 100%; height: 100%; object-fit: cover; z-index: 3; position: absolute; top: 0; left: 0; }
 
-        .result-card {
-            background: var(--result-bg);
-            border: 2px solid var(--result-border);
-            border-radius: 16px; padding: 12px 16px;
-            display: flex; align-items: center; gap: 16px;
-            width: 100%;
-            opacity: 0; 
-            visibility: hidden;
-            transform: translateY(10px);
-            transition: all 0.2s ease-out;
-        }
-
-        .result-card.active {
-            opacity: 1;
-            visibility: visible;
-            transform: translateY(0);
-        }
-
-        .avatar {
-            width: 50px; height: 50px; border-radius: 12px;
-            object-fit: cover; border: 2px solid var(--primary); background-color: #fff;
-        }
-
-        .info-col { display: flex; flex-direction: column; justify-content: center; }
-        .id-text { color: var(--primary); font-size: 13px; font-weight: 700; text-transform: uppercase; margin-bottom: 2px; }
-        .name-text { color: var(--text-dark); font-size: 18px; font-weight: 700; }
-    </style>
+    .info-content { display: flex; flex-direction: column; gap: 2px; flex: 1; overflow: hidden; }
+    .info-subtitle { font-size: 0.8rem; text-transform: uppercase; color: #64748B; font-weight: 800; }
+    .info-title { font-size: 1.1rem; font-weight: 800; color: #0F172A; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  </style>
 </head>
 <body>
 
-    <div class="main-card">
-        <div class="scanner-container">
-            <div id="status-msg">Đang khởi tạo hệ thống AI...</div>
-
-            <video id="video" autoplay muted playsinline></video>
-            <canvas id="overlay"></canvas>
-            
-            <button class="camera-btn" onclick="toggleCamera()">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
-                    <polyline points="15 10 17 12 15 14"></polyline>
-                    <polyline points="9 14 7 12 9 10"></polyline>
-                </svg>
-            </button>
-        </div>
-
-        <div class="result-wrapper">
-            <div id="resultCard" class="result-card">
-                <img id="res-avatar" class="avatar" src="https://i.imgur.com/6VBx3io.png" onerror="this.src='https://i.imgur.com/6VBx3io.png'">
-                <div class="info-col">
-                    <span class="id-text">MÃ ID: <span id="res-mnv">...</span></span>
-                    <span class="name-text" id="res-name">...</span>
-                </div>
-            </div>
-        </div>
+  <div class="app-card">
+    <div class="camera-container" id="container">
+      <button class="icon-btn" onclick="switchCamera()" title="Đổi camera">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20 9V7a2 2 0 0 0-2-2h-3.28a2 2 0 0 1-1.34-.53l-1.06-1.06A2 2 0 0 0 10.9 3H7a2 2 0 0 0-2 2v4"></path>
+          <path d="M4 11v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"></path>
+          <path d="M12 16a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"></path>
+          <polyline points="22 7 20 9 18 7"></polyline>
+          <polyline points="2 13 4 11 6 13"></polyline>
+        </svg>
+      </button>
+      
+      <div id="scan-line" class="scan-line"></div>
+      <video id="video" autoplay muted playsinline></video>
     </div>
 
-    <script>
-        const video = document.getElementById('video');
-        const overlay = document.getElementById('overlay');
-        const resultCard = document.getElementById('resultCard');
-        const statusMsg = document.getElementById('status-msg');
+    <div id="info-box" class="info-box">
+      <div id="info-visual" class="info-visual">
+        <div id="info-icon" class="info-icon">⏳</div>
+        <img id="info-avatar" class="info-avatar" src="" alt="Avatar" style="display: none;" onerror="this.style.display='none'; document.getElementById('info-icon').style.display='flex';">
+      </div>
+      <div class="info-content">
+        <span id="info-subtitle" class="info-subtitle">Hệ Thống</span>
+        <span id="info-title" class="info-title">Đang khởi tạo AI...</span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzLFwJo3omYl1N7nyqCD5Lq7GJzGc4dCWrpUYWg7IgGiu6e-Budpn4aGrySBEvvPcCI/exec"; 
+    
+    let faceMatcher = null; 
+    let canvas = null;
+    let displaySize = null;
+    let currentFacingMode = "user"; 
+    let currentStream = null;
+    let isRunning = false;
+    let employeeData = {};
+    let lastScanLabel = ""; 
+
+    const video = document.getElementById('video');
+    const container = document.getElementById('container');
+    const scanLine = document.getElementById('scan-line');
+    
+    const infoBox = document.getElementById('info-box');
+    const infoIcon = document.getElementById('info-icon');
+    const infoAvatar = document.getElementById('info-avatar');
+    const infoTitle = document.getElementById('info-title');
+    const infoSubtitle = document.getElementById('info-subtitle');
+
+    function getDirectImageUrl(url) {
+      if (!url) return '';
+      const match = url.match(/[-\w]{25,}/);
+      return match ? `https://drive.google.com/thumbnail?id=${match[0]}&sz=w200-h200-c` : url;
+    }
+
+    function updateStatusUI(state, icon, title, subtitle, avatarUrl = null) {
+      infoTitle.innerText = title;
+      infoSubtitle.innerText = subtitle;
+      infoBox.className = `info-box ${state}`;
+
+      if (avatarUrl) {
+        infoIcon.style.display = 'none';
+        infoAvatar.src = getDirectImageUrl(avatarUrl);
+        infoAvatar.style.display = 'block';
+      } else {
+        infoAvatar.style.display = 'none';
+        infoIcon.innerText = icon;
+        infoIcon.style.display = 'flex';
+      }
+    }
+
+    async function loadModels() {
+      const MODEL_URL = 'https://justadudewhohacks.github.io/face-api.js/models';
+      try {
+        updateStatusUI('', '⏳', 'Đang tải AI...', 'Hệ Thống');
+        await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+        await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
+        await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
         
-        const GET_DATA_URL = 'https://script.google.com/macros/s/AKfycbzwoSShI37Pg6P4GhIYSwpcGkN_LeO0fLldHWBvYyz96PFx_qCAfV7IE3mBxFheZXrDNQ/exec';
-        const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/';
+        startCamera(currentFacingMode);
+      } catch (e) {
+        updateStatusUI('danger', '❌', 'Không thể tải AI', 'Lỗi Mạng');
+      }
+    }
+
+    async function startCamera(facingMode) {
+      isRunning = false;
+      
+      if (currentStream) currentStream.getTracks().forEach(track => track.stop());
+
+      try {
+        const constraints = { video: { width: { ideal: 720 }, height: { ideal: 960 }, facingMode: facingMode } };
+        currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+        video.srcObject = currentStream;
+
+        video.className = facingMode === "user" ? "front-camera" : "back-camera";
+        if (canvas) canvas.className = video.className;
         
-        let faceMatcher = null;
-        let isRunning = false;
-        let useFrontCamera = true;
-        let mediaStream = null;
-        let audioCtx = null;
-        let lastDetectedMnv = null;
-        let cachedDatabase = null;
-        let lastFrameTime = 0;
-        const FPS_LIMIT = 100; // Giới hạn giãn cách giữa các khung hình AI để chống quá tải bộ nhớ và treo trình duyệt
+        video.onloadedmetadata = () => {
+          video.play();
+          if (!canvas) {
+            canvas = faceapi.createCanvasFromMedia(video);
+            container.append(canvas);
+          }
+          displaySize = { width: video.videoWidth, height: video.videoHeight };
+          faceapi.matchDimensions(canvas, displaySize);
 
-        function playSuccessSound() {
-            try {
-                if (!audioCtx) {
-                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                }
-                if (audioCtx.state === 'suspended') {
-                    audioCtx.resume();
-                }
-                const osc = audioCtx.createOscillator();
-                const gain = audioCtx.createGain();
-                osc.type = 'sine';
-                osc.frequency.setValueAtTime(800, audioCtx.currentTime);
-                gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
-                osc.connect(gain);
-                gain.connect(audioCtx.destination);
-                osc.start();
-                osc.stop(audioCtx.currentTime + 0.15);
-            } catch (e) {
-                console.error("Lỗi phát âm thanh:", e);
-            }
-        }
+          if (!faceMatcher) loadDataFromAppsScript();
+          else startSmoothRecognition();
+        };
+      } catch (err) {
+        updateStatusUI('danger', '📷', 'Vui lòng cấp quyền', 'Lỗi Camera');
+      }
+    }
 
-        function getDirectDriveUrl(url) {
-            if (!url) return 'https://i.imgur.com/6VBx3io.png';
-            const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
-            if (match && match[1]) {
-                return `https://drive.google.com/uc?export=view&id=${match[1]}`;
-            }
-            return url;
-        }
+    function switchCamera() {
+      currentFacingMode = (currentFacingMode === "user") ? "environment" : "user";
+      startCamera(currentFacingMode);
+    }
 
-        async function init() {
-            try {
-                if (typeof faceapi === 'undefined') throw new Error("Chưa tải được thư viện AI.");
-
-                statusMsg.innerText = 'Đang nạp mô hình nhận diện thông minh...';
-                await Promise.all([
-                    faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
-                    faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
-                    faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
-                ]);
-
-                if (!cachedDatabase) {
-                    statusMsg.innerText = 'Đang lấy dữ liệu lần đầu từ API...';
-                    const response = await fetch(GET_DATA_URL);
-                    const result = await response.json();
-
-                    if (result.status === "success" && result.data) {
-                        cachedDatabase = result.data;
-                    } else {
-                        throw new Error("Dữ liệu API trống hoặc không hợp lệ!");
-                    }
-                } else {
-                    statusMsg.innerText = 'Đã tải dữ liệu từ bộ nhớ đệm...';
-                }
-
-                const labeledDescriptors = cachedDatabase.map(person => {
-                    const float32Array = new Float32Array(person.embeddings);
-                    const labelData = JSON.stringify({ mnv: person.mnv, name: person.hoTen, driveUrl: person.driveUrl });
-                    return new faceapi.LabeledFaceDescriptors(labelData, [float32Array]);
-                });
-
-                faceMatcher = new faceapi.FaceMatcher(labeledDescriptors, 0.38); 
-                statusMsg.style.display = 'none';
-                startWebcam();
-
-            } catch (error) {
-                statusMsg.innerText = 'Lỗi: ' + error.message;
-            }
-        }
-
-        function startWebcam() {
-            const facingMode = useFrontCamera ? 'user' : 'environment';
+    async function loadDataFromAppsScript() {
+      try {
+        updateStatusUI('scanning', '🔄', 'Đang tải dữ liệu...', 'Đồng Bộ');
+        const response = await fetch(SCRIPT_URL);
+        const result = await response.json();
+        
+        if (result.status === "success") {
+          const labeledFaceDescriptors = [];
+          for (let i = 0; i < result.data.length; i++) {
+            const row = result.data[i];
+            const empId = row[0], empName = row[2], rawFaceData = row[3], empImage = row[4]; 
+            if (!empId || !rawFaceData) continue;
             
-            if (useFrontCamera) {
-                video.classList.add('mirror');
-                overlay.classList.add('mirror');
-            } else {
-                video.classList.remove('mirror');
-                overlay.classList.remove('mirror');
-            }
-
-            navigator.mediaDevices.getUserMedia({ 
-                video: { facingMode: facingMode, width: { ideal: 640 }, height: { ideal: 480 } } 
-            })
-            .then(stream => { 
-                mediaStream = stream;
-                video.srcObject = stream; 
-            })
-            .catch(err => { 
-                statusMsg.innerText = 'Chưa cấp quyền Camera'; 
-                statusMsg.style.display = 'block'; 
-            });
-        }
-
-        function stopWebcam() {
-            if (mediaStream) {
-                mediaStream.getTracks().forEach(track => track.stop());
-                mediaStream = null;
-            }
-            if (video.srcObject) {
-                video.srcObject = null;
-            }
-        }
-
-        function toggleCamera() {
-            useFrontCamera = !useFrontCamera;
-            stopWebcam();
-            startWebcam();
-        }
-
-        // HÀM QUÉT AI LIÊN TỤC VỚI CƠ CHẾ CHỐNG TREO BỘ NHỚ
-        async function detectFaces(timestamp) {
-            if (!isRunning || document.hidden || !mediaStream || !faceMatcher || video.paused || video.ended) {
-                return;
-            }
-
-            // Kiểm tra và điều tiết thời gian thực thi khung hình để tránh quá tải CPU/GPU
-            if (timestamp - lastFrameTime >= FPS_LIMIT) {
-                lastFrameTime = timestamp;
-
-                try {
-                    const detectorOptions = new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.65 });
-                    const detections = await faceapi.detectAllFaces(video, detectorOptions)
-                        .withFaceLandmarks()
-                        .withFaceDescriptors();
-
-                    const displaySize = { width: video.clientWidth, height: video.clientHeight };
-                    const resizedDetections = faceapi.resizeResults(detections, displaySize);
-                    
-                    const ctx = overlay.getContext('2d');
-                    ctx.clearRect(0, 0, overlay.width, overlay.height);
-
-                    let matchedPerson = null;
-
-                    if (resizedDetections.length > 0) {
-                        resizedDetections.forEach(detection => {
-                            const match = faceMatcher.findBestMatch(detection.descriptor);
-                            const box = detection.detection.box;
-
-                            if (match.label !== 'unknown') {
-                                try {
-                                    const personData = JSON.parse(match.label);
-                                    matchedPerson = personData; 
-                                    
-                                    const drawBox = new faceapi.draw.DrawBox(box, { 
-                                        label: personData.name, 
-                                        lineWidth: 2, 
-                                        boxColor: "#00bfa5",
-                                        drawLabelOptions: { fontSize: 14, fontColor: '#fff', backgroundColor: "#00bfa5", padding: 4 }
-                                    });
-                                    drawBox.draw(overlay);
-
-                                    if (lastDetectedMnv !== personData.mnv) {
-                                        playSuccessSound();
-                                        lastDetectedMnv = personData.mnv;
-                                    }
-
-                                } catch (e) { console.error(e); }
-                            }
-                        });
-                    } else {
-                        lastDetectedMnv = null;
-                    }
-
-                    if (matchedPerson) {
-                        resultCard.classList.add('active');
-                        document.getElementById('res-mnv').innerText = matchedPerson.mnv;
-                        document.getElementById('res-name').innerText = matchedPerson.name;
-                        
-                        if(matchedPerson.driveUrl) {
-                            const newImgSrc = getDirectDriveUrl(matchedPerson.driveUrl);
-                            const currentImgSrc = document.getElementById('res-avatar').src;
-                            if (currentImgSrc !== newImgSrc) {
-                                document.getElementById('res-avatar').src = newImgSrc;
-                            }
-                        }
-                    } else {
-                        resultCard.classList.remove('active');
-                    }
-                } catch (err) {
-                    console.error("Lỗi trong vòng lặp quét AI:", err);
-                }
-            }
-
-            if (isRunning) {
-                requestAnimationFrame(detectFaces);
-            }
-        }
-
-        video.addEventListener('play', () => {
-            overlay.width = video.clientWidth;
-            overlay.height = video.clientHeight;
+            employeeData[empId] = { name: empName, image: empImage };
+            try {
+              const parsedArray = typeof rawFaceData === 'string' ? JSON.parse(rawFaceData) : rawFaceData;
+              if (Array.isArray(parsedArray) && parsedArray.length > 0) {
+                labeledFaceDescriptors.push(new faceapi.LabeledFaceDescriptors(String(empId), [new Float32Array(parsedArray)]));
+              }
+            } catch (err) { console.error("Lỗi parse:", err); }
+          }
+          if (labeledFaceDescriptors.length > 0) {
             
-            if (!isRunning) {
-                isRunning = true;
-                requestAnimationFrame(detectFaces);
-            }
-        });
+            // 🚀 BƯỚC NÂNG CẤP 1: GIẢM NGƯỠNG TỪ 0.45 XUỐNG 0.38 (AI CHỈ NHẬN KHI KHUÔN MẶT ĐẠT ĐỘ KHỚP CAO NHẤT)
+            faceMatcher = new faceapi.FaceMatcher(labeledFaceDescriptors, 0.38);
+            
+            startSmoothRecognition();
+          } else {
+            updateStatusUI('scanning', '⏳', 'Hệ thống sẵn sàng', 'Chờ dữ liệu');
+          }
+        }
+      } catch (error) { updateStatusUI('danger', '🔌', 'Lỗi kết nối máy chủ', 'Hệ Thống'); }
+    }
 
-        // Tự động phục hồi khi chuyển tab hoặc bật lại màn hình điện thoại
-        document.addEventListener('visibilitychange', () => {
-            if (document.hidden) {
-                isRunning = false;
-                stopWebcam();
+    async function startSmoothRecognition() {
+      isRunning = true;
+      scanLine.style.display = 'block'; 
+      updateStatusUI('scanning', '🎯', 'Đang quét khuôn mặt...', 'Sẵn Sàng');
+
+      // 🚀 BƯỚC NÂNG CẤP 2: TĂNG inputSize LÊN 416 (GIÚP AI NHÌN RÕ HƠN, XA HƠN) & scoreThreshold LÊN 0.6
+      const options = new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.6 });
+      const ctx = canvas.getContext('2d');
+
+      const detectFrame = async () => {
+        if (!isRunning || video.paused || video.ended || !faceMatcher) return;
+        try {
+          const detection = await faceapi.detectSingleFace(video, options).withFaceLandmarks().withFaceDescriptor();
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+          if (!detection) {
+            if (lastScanLabel !== "scanning") {
+              updateStatusUI('scanning', '🎯', 'Đang quét khuôn mặt...', 'Sẵn Sàng');
+              lastScanLabel = "scanning";
+            }
+          } else {
+            const resizedDetection = faceapi.resizeResults(detection, displaySize);
+            const bestMatch = faceMatcher.findBestMatch(resizedDetection.descriptor);
+            const box = resizedDetection.detection.box;
+            const isStranger = bestMatch.label === "unknown";
+
+            if (isStranger) {
+              if (lastScanLabel !== "scanning") {
+                updateStatusUI('scanning', '🎯', 'Đang quét khuôn mặt...', 'Sẵn Sàng');
+                lastScanLabel = "scanning";
+              }
             } else {
-                if (!mediaStream) {
-                    startWebcam();
+              const drawBox = new faceapi.draw.DrawBox(box, {
+                label: employeeData[bestMatch.label].name,
+                boxColor: "#10B981",
+                lineWidth: 3,
+                drawLabelOptions: {
+                  backgroundColor: "#10B981",
+                  fontColor: '#FFFFFF', fontSize: 16, padding: 10
                 }
-                isRunning = true;
-                requestAnimationFrame(detectFaces);
-            }
-        });
+              });
+              drawBox.draw(canvas);
 
-        window.addEventListener('load', init);
-    </script>
+              if (lastScanLabel !== bestMatch.label) {
+                lastScanLabel = bestMatch.label;
+                const emp = employeeData[bestMatch.label];
+                updateStatusUI('success', '✅', emp.name, `Mã ID: ${bestMatch.label}`, emp.image);
+              }
+            }
+          }
+        } catch (err) { console.error("Lỗi AI:", err); }
+
+        if (isRunning) requestAnimationFrame(detectFrame);
+      };
+      
+      detectFrame();
+    }
+
+    window.onload = loadModels;
+  </script>
 </body>
 </html>
