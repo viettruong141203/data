@@ -3,10 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI Face ID Scanner</title>
-    <!-- Font chữ hiện đại -->
+    <title>AI Face Scanner</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
-    <!-- Thư viện Face-api -->
     <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.min.js"></script>
     <style>
         :root {
@@ -25,39 +23,19 @@
             color: #fff;
             min-height: 100vh;
             display: flex;
-            flex-direction: column;
-            align-items: center;
+            align-items: center; /* Căn giữa theo chiều dọc */
+            justify-content: center; /* Căn giữa theo chiều ngang */
             padding: 20px;
         }
 
-        .header {
-            text-align: center;
-            margin-bottom: 30px;
-            margin-top: 20px;
-        }
-        
-        .header h1 {
-            font-size: 28px;
-            font-weight: 600;
-            background: -webkit-linear-gradient(45deg, #4facfe, #00f2fe);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-        }
-        
-        .header p { color: #a8b2d1; font-size: 14px; margin-top: 5px; }
-
         .container {
-            display: grid;
-            grid-template-columns: 1fr;
+            display: flex;
+            flex-wrap: wrap;
             gap: 30px;
             width: 100%;
             max-width: 1000px;
-        }
-
-        @media (min-width: 800px) {
-            .container { grid-template-columns: 1.5fr 1fr; }
+            justify-content: center;
+            align-items: flex-start;
         }
 
         /* Glass Panel Effect */
@@ -69,6 +47,26 @@
             border-radius: 20px;
             padding: 24px;
             box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+            flex: 1 1 450px;
+            max-width: 600px;
+        }
+
+        /* Panel kết quả - Ẩn mặc định */
+        .result-panel {
+            flex: 1 1 300px;
+            max-width: 400px;
+            position: relative;
+            overflow: hidden;
+            display: none; 
+            animation: fadeIn 0.4s ease-out;
+        }
+
+        .result-panel::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; width: 5px; height: 100%;
+            background: var(--success);
+            box-shadow: 0 0 10px var(--success);
         }
 
         /* Camera Box */
@@ -82,16 +80,13 @@
             border: 2px solid rgba(0, 242, 254, 0.3);
         }
 
-        /* Hiệu ứng tia quét ngang */
         .scan-line {
             position: absolute;
             width: 100%;
             height: 4px;
             background: var(--primary);
             box-shadow: 0 0 15px var(--primary), 0 0 30px var(--primary);
-            top: 0;
-            left: 0;
-            z-index: 10;
+            top: 0; left: 0; z-index: 10;
             animation: scan 3s linear infinite;
             opacity: 0.7;
         }
@@ -102,88 +97,25 @@
             100% { top: 0; }
         }
 
-        /* Lật camera chuẩn gương */
-        video, canvas {
-            transform: scaleX(-1);
-            -webkit-transform: scaleX(-1);
-        }
-
-        video {
-            width: 100%;
-            height: auto;
-            display: block;
-            object-fit: cover;
-        }
-
-        canvas {
-            position: absolute;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-        }
-
-        /* Info Panel */
-        .info-title {
-            font-size: 16px;
-            font-weight: 500;
-            color: #a8b2d1;
-            margin-bottom: 15px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .status-indicator {
-            padding: 10px 15px;
-            border-radius: 12px;
-            font-size: 14px;
-            font-weight: 500;
-            text-align: center;
-            background: rgba(255,255,255,0.05);
-            border: 1px solid rgba(255,255,255,0.1);
-            transition: all 0.3s ease;
-        }
-        
-        .status-loading { color: #f6d365; border-color: rgba(246, 211, 101, 0.3); }
-        .status-success { color: var(--success); border-color: rgba(0, 255, 135, 0.3); box-shadow: 0 0 15px rgba(0,255,135,0.1); }
-        .status-error { color: var(--danger); border-color: rgba(255, 15, 123, 0.3); }
-
-        /* Kết quả thẻ định danh */
-        .id-card {
-            margin-top: 25px;
-            background: linear-gradient(135deg, rgba(255,255,255,0.1), rgba(255,255,255,0.02));
-            border: 1px solid rgba(255,255,255,0.2);
-            border-radius: 16px;
-            padding: 20px;
-            position: relative;
-            overflow: hidden;
-            display: none; /* Ẩn mặc định */
-            animation: fadeIn 0.4s ease-out;
-        }
-
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
         }
 
-        .id-card::before {
-            content: '';
-            position: absolute;
-            top: 0; left: 0; width: 5px; height: 100%;
-            background: var(--success);
-            box-shadow: 0 0 10px var(--success);
+        video, canvas {
+            transform: scaleX(-1);
+            -webkit-transform: scaleX(-1);
         }
 
+        video { width: 100%; height: auto; display: block; object-fit: cover; }
+        canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+
         .id-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 12px;
-            border-bottom: 1px dashed rgba(255,255,255,0.1);
-            padding-bottom: 12px;
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 12px; border-bottom: 1px dashed rgba(255,255,255,0.1); padding-bottom: 12px;
         }
         
         .id-row:last-child { margin-bottom: 0; border-bottom: none; padding-bottom: 0; }
-        
         .id-label { color: #a8b2d1; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; }
         .id-value { font-size: 16px; font-weight: 600; color: #fff; }
         .id-value.highlight { color: var(--success); text-shadow: 0 0 10px rgba(0, 255, 135, 0.5); font-size: 18px; }
@@ -192,13 +124,8 @@
 </head>
 <body>
 
-    <div class="header">
-        <h1>AI Face Scanner</h1>
-        <p>Hệ thống định danh tự động</p>
-    </div>
-
     <div class="container">
-        <!-- Khung Camera bên trái -->
+        <!-- Khung Camera -->
         <div class="glass-panel">
             <div class="scanner-container">
                 <div class="scan-line"></div>
@@ -207,31 +134,19 @@
             </div>
         </div>
 
-        <!-- Bảng thông tin bên phải -->
-        <div class="glass-panel">
-            <div class="info-title">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
-                Trạng thái hệ thống
+        <!-- Thẻ định danh -->
+        <div id="resultCard" class="glass-panel result-panel">
+            <div class="id-row">
+                <span class="id-label">Mã nhân sự</span>
+                <span class="id-value" id="res-mnv">...</span>
             </div>
-            
-            <div id="status" class="status-indicator status-loading">
-                Đang khởi tạo lõi AI...
+            <div class="id-row">
+                <span class="id-label">Họ & Tên</span>
+                <span class="id-value" id="res-name">...</span>
             </div>
-
-            <!-- Thẻ định danh -->
-            <div id="resultCard" class="id-card">
-                <div class="id-row">
-                    <span class="id-label">Mã nhân sự</span>
-                    <span class="id-value" id="res-mnv">...</span>
-                </div>
-                <div class="id-row">
-                    <span class="id-label">Họ & Tên</span>
-                    <span class="id-value" id="res-name">...</span>
-                </div>
-                <div class="id-row">
-                    <span class="id-label">Độ tin cậy (Match)</span>
-                    <span class="id-value highlight" id="res-score">...</span>
-                </div>
+            <div class="id-row">
+                <span class="id-label">Độ tin cậy</span>
+                <span class="id-value highlight" id="res-score">...</span>
             </div>
         </div>
     </div>
@@ -239,7 +154,6 @@
     <script>
         const video = document.getElementById('video');
         const overlay = document.getElementById('overlay');
-        const statusEl = document.getElementById('status');
         const resultCard = document.getElementById('resultCard');
         
         const API_URL = 'https://script.google.com/macros/s/AKfycbzwoSShI37Pg6P4GhIYSwpcGkN_LeO0fLldHWBvYyz96PFx_qCAfV7IE3mBxFheZXrDNQ/exec';
@@ -248,27 +162,23 @@
         let faceMatcher = null;
         let isDetecting = false;
 
-        function updateStatus(message, type = 'status-loading') {
-            statusEl.className = `status-indicator ${type}`;
-            statusEl.innerText = message;
+        // In trạng thái ra Console thay vì hiển thị trên UI
+        function logStatus(message) {
+            console.log(`[Hệ thống]: ${message}`);
         }
 
         async function init() {
             try {
-                if (typeof faceapi === 'undefined') {
-                    throw new Error("Không thể tải thư viện AI.");
-                }
+                if (typeof faceapi === 'undefined') throw new Error("Không thể tải thư viện AI.");
 
-                updateStatus('Đang nạp mô hình Neural Network...', 'status-loading');
-                
-                // Dùng model Tiny mượt mà
+                logStatus('Đang nạp mô hình...');
                 await Promise.all([
                     faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
                     faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
                     faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
                 ]);
 
-                updateStatus('Đang đồng bộ dữ liệu API...', 'status-loading');
+                logStatus('Đang tải dữ liệu API...');
                 const response = await fetch(API_URL);
                 const result = await response.json();
 
@@ -279,17 +189,14 @@
                         return new faceapi.LabeledFaceDescriptors(labelData, [float32Array]);
                     });
 
-                    // Ngưỡng 0.45
                     faceMatcher = new faceapi.FaceMatcher(labeledDescriptors, 0.45);
-                    
-                    updateStatus(`Đã sẵn sàng - Đồng bộ ${result.total} nhân sự`, 'status-success');
+                    logStatus(`Đã sẵn sàng - Đồng bộ ${result.total} nhân sự`);
                     startWebcam();
                 } else {
-                    updateStatus('Lỗi: Dữ liệu API trống', 'status-error');
+                    logStatus('Lỗi: Dữ liệu API trống');
                 }
             } catch (error) {
-                console.error(error);
-                updateStatus('Lỗi hệ thống: ' + error.message, 'status-error');
+                console.error('Lỗi hệ thống: ', error);
             }
         }
 
@@ -297,12 +204,8 @@
             navigator.mediaDevices.getUserMedia({ 
                 video: { facingMode: 'user', width: { ideal: 720 }, height: { ideal: 540 } } 
             })
-            .then(stream => {
-                video.srcObject = stream;
-            })
-            .catch(err => {
-                updateStatus('Chưa cấp quyền truy cập Camera', 'status-error');
-            });
+            .then(stream => { video.srcObject = stream; })
+            .catch(err => { console.error('Chưa cấp quyền truy cập Camera', err); });
         }
 
         async function detectFaces() {
@@ -329,15 +232,14 @@
                     const box = detection.detection.box;
 
                     let drawLabel = "Khách lạ";
-                    let boxColor = "#ff0f7b"; // Đỏ Neon (Khách)
+                    let boxColor = "#ff0f7b";
 
                     if (match.label !== 'unknown') {
-                        boxColor = "#00ff87"; // Xanh Neon (Đã nhận diện)
+                        boxColor = "#00ff87";
                         try {
                             const personData = JSON.parse(match.label);
                             drawLabel = personData.name;
                             
-                            // Cập nhật UI
                             resultCard.style.display = 'block';
                             document.getElementById('res-mnv').innerText = personData.mnv;
                             document.getElementById('res-name').innerText = personData.name;
@@ -350,23 +252,16 @@
                         resultCard.style.display = 'none';
                     }
 
-                    // Tùy chỉnh khung vẽ cực chất
                     const drawBox = new faceapi.draw.DrawBox(box, { 
                         label: drawLabel, 
                         lineWidth: 3, 
                         boxColor: boxColor,
-                        drawLabelOptions: { 
-                            fontSize: 18,
-                            fontColor: '#000',
-                            backgroundColor: boxColor,
-                            padding: 10
-                        }
+                        drawLabelOptions: { fontSize: 18, fontColor: '#000', backgroundColor: boxColor, padding: 10 }
                     });
                     drawBox.draw(overlay);
                 });
             }
 
-            // Dùng setTimeout + requestAnimationFrame để luồng chạy êm, ko nóng máy
             setTimeout(() => {
                 requestAnimationFrame(detectFaces);
             }, 50);
