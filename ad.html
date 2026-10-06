@@ -9,6 +9,7 @@
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', sans-serif; }
     body, html { width: 100%; height: 100%; background: radial-gradient(circle at 50% 20%, #1e1b4b 0%, #0f172a 100%); display: flex; justify-content: center; align-items: center; padding: 16px; color: #f8fafc; }
+    
     .app-card { background: rgba(30, 41, 59, 0.65); backdrop-filter: blur(24px); padding: 28px; border-radius: 36px; box-shadow: 0 30px 60px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.15); border: 1px solid rgba(255, 255, 255, 0.08); width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 22px; animation: fadeIn 0.4s ease-out;}
     @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     
@@ -22,8 +23,10 @@
     .face-guide-circle { position: absolute; width: 210px; height: 210px; border: 2px dashed rgba(99, 102, 241, 0.6); border-radius: 50%; pointer-events: none; z-index: 5; transition: 0.3s; }
     .face-guide-circle.active { border-color: #10B981; border-style: solid; border-width: 3px; box-shadow: 0 0 35px rgba(16, 185, 129, 0.5); transform: scale(1.02); }
     
-    .icon-btn { position: absolute; top: 16px; right: 16px; width: 42px; height: 42px; background: rgba(15, 23, 42, 0.6); color: #FFFFFF; border: none; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 10; transition: 0.3s; }
-    .icon-btn:hover { background: rgba(99, 102, 241, 0.8); transform: scale(1.1) rotate(180deg); }
+    /* Nút lật camera chuẩn kính mờ - Góc dưới bên phải */
+    .icon-btn { position: absolute; bottom: 16px; right: 16px; width: 48px; height: 48px; background: rgba(0, 0, 0, 0.25); color: #FFFFFF; border: 1px solid rgba(255, 255, 255, 0.25); border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 30; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+    .icon-btn:hover { background: rgba(0, 0, 0, 0.45); transform: scale(1.1) rotate(180deg); }
+    .icon-btn svg { width: 22px; height: 22px; stroke: currentColor; filter: drop-shadow(0px 2px 3px rgba(0,0,0,0.5)); }
     
     .progress-container { width: 100%; background: rgba(255, 255, 255, 0.08); height: 6px; border-radius: 4px; overflow: hidden; margin-bottom: -10px;}
     .progress-bar { width: 0%; height: 100%; background: linear-gradient(90deg, #6366F1, #10B981); transition: 0.05s; }
@@ -42,13 +45,19 @@
     #section-success { text-align: center; display: none; }
     .success-avatar { width: 120px; height: 120px; margin: 0 auto 10px; border-radius: 50%; padding: 4px; background: linear-gradient(135deg, #10B981, #34D399); box-shadow: 0 0 30px rgba(16, 185, 129, 0.4); }
     .success-avatar img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; border: 3px solid #1e293b; }
+    
     .info-group { background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 12px 16px; display: flex; flex-direction: column; gap: 4px; text-align: left; margin-bottom: 10px;}
     .info-group label { font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px; }
     .info-group .value { font-size: 1.1rem; color: #ffffff; font-weight: 700; }
     .info-group .value.highlight { color: #34D399; font-size: 1.3rem; letter-spacing: 1px; }
     
-    /* Nút Sync ngầm */
     .sync-status { font-size: 0.75rem; color: #94a3b8; margin-top: 5px; font-weight: 600; }
+
+    /* Nút sao chép ID */
+    .copy-btn { background: rgba(52, 211, 153, 0.15); border: 1px solid rgba(52, 211, 153, 0.3); color: #34D399; padding: 6px 12px; border-radius: 10px; font-size: 0.8rem; font-weight: 700; cursor: pointer; transition: 0.2s; display: flex; align-items: center; gap: 6px; }
+    .copy-btn:hover { background: rgba(52, 211, 153, 0.3); }
+    .copy-btn.copied { background: #10B981; color: white; border-color: #10B981; }
+    .flex-row { display: flex; justify-content: space-between; align-items: center; }
   </style>
 </head>
 <body>
@@ -57,8 +66,14 @@
     
     <div id="section-scan" class="section-card">
       <div class="camera-container" id="container">
+        <!-- NÚT LẬT CAMERA MỚI -->
         <button class="icon-btn" onclick="switchCamera()">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px"><path d="M20 9V7a2 2 0 0 0-2-2h-3.28a2 2 0 0 1-1.34-.53l-1.06-1.06A2 2 0 0 0 10.9 3H7a2 2 0 0 0-2 2v4"></path><path d="M4 11v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"></path><path d="M12 16a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"></path><polyline points="22 7 20 9 18 7"></polyline><polyline points="2 13 4 11 6 13"></polyline></svg>
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10"></path>
+            <polyline points="1 4 1 10 7 10"></polyline>
+            <path d="M3.51 15A9 9 0 0 0 18.36 18.36L23 14"></path>
+            <polyline points="23 20 23 14 17 14"></polyline>
+          </svg>
         </button>
         <div id="guide-circle" class="face-guide-circle"></div>
         <video id="video" autoplay muted playsinline></video>
@@ -71,15 +86,23 @@
       <a href="index.html" class="back-link">Quay về Check-in</a>
     </div>
 
-    <!-- PHẦN 2: BẢNG THÔNG TIN HIỆN NGAY LẬP TỨC 0s -->
+    <!-- MÀN HÌNH THÀNH CÔNG -->
     <div id="section-success" class="section-card">
       <div class="success-avatar"><img id="success-img" src="" alt="Avatar"></div>
       <h3 style="color: #34D399; font-weight: 800; font-size: 1.2rem;">Đăng Ký Thành Công!</h3>
       
       <div class="info-group">
         <label>Mã ID Nhân Sự</label>
-        <div id="success-id" class="value highlight">---</div>
+        <div class="flex-row">
+          <div id="success-id" class="value highlight">---</div>
+          <!-- NÚT COPY ID -->
+          <button class="copy-btn" onclick="copyID('success-id', this)">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+            Copy
+          </button>
+        </div>
       </div>
+      
       <div class="info-group">
         <label>Thời Gian Ghi Nhận</label>
         <div id="success-time" class="value">---</div>
@@ -97,7 +120,7 @@
     
     let currentStream = null, currentFacingMode = "user", existingFaceMatcher = null;
     let isDataReady = false, isScanningActive = false, scanTimer = 0, collectedDescriptors = [];
-    let listExistingIDs = []; // Mảng chứa ID để check trùng nhanh
+    let listExistingIDs = []; 
 
     const video = document.getElementById('video'), btnAction = document.getElementById('btn-action');
     const statusBox = document.getElementById('status-box'), progressBar = document.getElementById('progress-bar'), guideCircle = document.getElementById('guide-circle');
@@ -116,12 +139,9 @@
         if (result.status === "success" && result.data.length > 0) {
           const labeledDescriptors = [];
           for (let i = 0; i < result.data.length; i++) {
-            const empId = String(result.data[i][0]);
-            const rawFaceData = result.data[i][2];
+            const empId = String(result.data[i][0]), rawFaceData = result.data[i][2];
             if (!empId || !rawFaceData) continue;
-            
-            listExistingIDs.push(empId); // Lưu lại ID vào mảng
-
+            listExistingIDs.push(empId); 
             try {
               const parsed = typeof rawFaceData === 'string' ? JSON.parse(rawFaceData) : rawFaceData;
               if (Array.isArray(parsed)) labeledDescriptors.push(new faceapi.LabeledFaceDescriptors(empId, [new Float32Array(parsed)]));
@@ -161,21 +181,24 @@
 
     async function runInstantDetectionLoop() {
       const options = new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.5 });
+      const targetTimeMs = 200; 
+      const frameIntervalMs = 25; 
       let lastTime = Date.now();
+
       const detectFrame = async () => {
         if (!isScanningActive || video.paused || video.ended) return;
         const now = Date.now();
-        if (now - lastTime >= 25) {
+        if (now - lastTime >= frameIntervalMs) {
           lastTime = now;
           try {
             const detection = await faceapi.detectSingleFace(video, options).withFaceLandmarks().withFaceDescriptor();
             if (detection) {
               const box = detection.detection.box, vCenter = { x: video.videoWidth / 2, y: video.videoHeight / 2 }, fCenter = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
               if (Math.abs(fCenter.x - vCenter.x) < 180 && Math.abs(fCenter.y - vCenter.y) < 180) {
-                scanTimer += 25; collectedDescriptors.push(detection.descriptor);
-                progressBar.style.width = `${Math.min(100, (scanTimer / 200) * 100)}%`; guideCircle.classList.add('active');
-                if (scanTimer >= 200) { isScanningActive = false; executeFinalValidation(); return; }
-              } else { resetCountdown("⚠️ Đưa mặt vào giữa vòng tròn"); }
+                scanTimer += frameIntervalMs; collectedDescriptors.push(detection.descriptor);
+                progressBar.style.width = `${Math.min(100, (scanTimer / targetTimeMs) * 100)}%`; guideCircle.classList.add('active');
+                if (scanTimer >= targetTimeMs) { isScanningActive = false; executeFinalValidation(); return; }
+              } else { resetCountdown("⚠️️ Đưa mặt vào giữa vòng tròn"); }
             } else { resetCountdown("🔍 Đang tìm kiếm khuôn mặt..."); }
           } catch (err) {}
         }
@@ -188,7 +211,6 @@
       if (scanTimer > 0) { scanTimer = 0; progressBar.style.width = '0%'; guideCircle.classList.remove('active'); statusBox.innerText = msg; statusBox.style.color = "#f87171"; collectedDescriptors = []; }
     }
 
-    // 🚀 LÕI SIÊU TỐC ĐỘ 
     async function executeFinalValidation() {
       video.pause();
       
@@ -200,7 +222,6 @@
 
       const avgDescriptor = getAverageDescriptor(collectedDescriptors);
       
-      // Chống trùng lặp FaceData
       if (existingFaceMatcher) {
         const matchResult = existingFaceMatcher.findBestMatch(new Float32Array(avgDescriptor));
         if (matchResult.label !== "unknown") {
@@ -209,15 +230,13 @@
         }
       }
 
-      // Tự sinh ID ngay trên trình duyệt
       const now = new Date();
       const yy = String(now.getFullYear()).slice(-2);
       const mm = String(now.getMonth() + 1).padStart(2, '0');
       const dd = String(now.getDate()).padStart(2, '0');
-      const datePrefix = yy + mm + dd; // YYMMDD
+      const datePrefix = yy + mm + dd; 
       
-      let isUnique = false;
-      let newId = "";
+      let isUnique = false, newId = "";
       while (!isUnique) {
         const randomNum = Math.floor(10000 + Math.random() * 90000);
         newId = datePrefix + randomNum.toString();
@@ -227,10 +246,8 @@
       const imageBase64 = canvas.toDataURL('image/jpeg', 0.85);
       const timeWeb = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')} ${dd}/${mm}/${now.getFullYear()}`;
 
-      // 1. HIỂN THỊ KẾT QUẢ NGAY LẬP TỨC (0 GIÂY CHỜ)
       showSuccessScreen(newId, timeWeb, imageBase64);
 
-      // 2. GỬI NGẦM LÊN SERVER
       const payload = { id: newId, faceData: JSON.stringify(avgDescriptor), time: timeWeb, imageBase64: imageBase64 };
       
       fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify(payload) })
@@ -241,8 +258,7 @@
             syncUI.innerText = "✅ Đồng bộ máy chủ hoàn tất!";
             syncUI.style.color = "#34D399";
           }
-        })
-        .catch(e => {
+        }).catch(e => {
           const syncUI = document.getElementById('sync-status');
           syncUI.innerText = "⚠️ Lỗi đồng bộ. Hãy kiểm tra mạng!";
           syncUI.style.color = "#f87171";
@@ -261,13 +277,26 @@
 
     function showSuccessScreen(id, time, imageSrc) {
       if (currentStream) currentStream.getTracks().forEach(t => t.stop());
-      
       document.getElementById('section-scan').style.display = 'none';
       document.getElementById('section-success').style.display = 'block';
       
       document.getElementById('success-id').innerText = id;
       document.getElementById('success-time').innerText = time;
       document.getElementById('success-img').src = imageSrc;
+    }
+
+    // Hàm sao chép ID vào bộ nhớ đệm
+    function copyID(elementId, btn) {
+      const text = document.getElementById(elementId).innerText;
+      navigator.clipboard.writeText(text).then(() => {
+        const originalHTML = btn.innerHTML;
+        btn.innerHTML = "✅ Đã chép";
+        btn.classList.add("copied");
+        setTimeout(() => {
+          btn.innerHTML = originalHTML;
+          btn.classList.remove("copied");
+        }, 2000);
+      });
     }
   </script>
 </body>
