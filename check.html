@@ -46,6 +46,9 @@
             border-radius: 16px;
             overflow: hidden;
             background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
         }
 
         video { 
@@ -65,13 +68,30 @@
             -webkit-transform: scaleX(-1);
         }
 
+        /* Dòng trạng thái nổi chính giữa camera */
+        #status-msg {
+            position: absolute;
+            z-index: 20;
+            background: rgba(0, 0, 0, 0.75);
+            color: #fff;
+            padding: 12px 24px;
+            border-radius: 30px;
+            font-size: 14px;
+            font-weight: 600;
+            text-align: center;
+            backdrop-filter: blur(4px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            max-width: 80%;
+        }
+
         .camera-btn {
             position: absolute; top: 12px; right: 12px;
             width: 40px; height: 40px;
             background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(4px);
             border-radius: 50%;
             display: flex; justify-content: center; align-items: center;
-            z-index: 15; border: none; cursor: pointer; color: white;
+            z-index: 25; border: none; cursor: pointer; color: white;
         }
 
         .result-wrapper {
@@ -107,15 +127,15 @@
         .info-col { display: flex; flex-direction: column; justify-content: center; }
         .id-text { color: var(--primary); font-size: 13px; font-weight: 700; text-transform: uppercase; margin-bottom: 2px; }
         .name-text { color: var(--text-dark); font-size: 18px; font-weight: 700; }
-        #status-msg { text-align: center; font-size: 14px; font-weight: 600; color: #666; padding: 5px 0; }
     </style>
 </head>
 <body>
 
     <div class="main-card">
-        <div id="status-msg">Đang khởi tạo hệ thống...</div>
-
         <div class="scanner-container">
+            <!-- Dòng đồng bộ dữ liệu hiện giữa màn hình camera -->
+            <div id="status-msg">Đang khởi tạo hệ thống...</div>
+
             <video id="video" autoplay muted playsinline></video>
             <canvas id="overlay"></canvas>
             
@@ -154,6 +174,28 @@
         let useFrontCamera = true;
         let scanTimeout = null;
         let lastSentLog = {}; 
+        let mediaStream = null;
+        let audioCtx = null;
+
+        // Hàm phát âm thanh báo hiệu (Beep) khi nhận diện thành công
+        function playSuccessSound() {
+            try {
+                if (!audioCtx) {
+                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(800, audioCtx.currentTime); // Tần số âm thanh
+                gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.15); // Kéo dài 150ms
+            } catch (e) {
+                console.error("Không thể phát âm thanh", e);
+            }
+        }
 
         function getDirectDriveUrl(url) {
             if (!url) return 'https://i.imgur.com/6VBx3io.png';
@@ -216,7 +258,7 @@
                     });
 
                     faceMatcher = new faceapi.FaceMatcher(labeledDescriptors, 0.38); 
-                    statusMsg.style.display = 'none';
+                    statusMsg.style.display = 'none'; // Ẩn thông báo khi hoàn tất tải dữ liệu
                     startWebcam();
                 } else {
                     statusMsg.innerText = 'Dữ liệu API trống!';
@@ -240,21 +282,36 @@
             navigator.mediaDevices.getUserMedia({ 
                 video: { facingMode: facingMode, width: { ideal: 640 }, height: { ideal: 480 } } 
             })
-            .then(stream => { video.srcObject = stream; })
-            .catch(err => { statusMsg.innerText = 'Chưa cấp quyền Camera'; statusMsg.style.display = 'block'; });
+            .then(stream => { 
+                mediaStream = stream;
+                video.srcObject = stream; 
+            })
+            .catch(err => { 
+                statusMsg.innerText = 'Chưa cấp quyền Camera'; 
+                statusMsg.style.display = 'block'; 
+            });
+        }
+
+        function stopWebcam() {
+            if (mediaStream) {
+                mediaStream.getTracks().forEach(track => track.stop());
+                mediaStream = null;
+            }
+            if (video.srcObject) {
+                video.srcObject = null;
+            }
         }
 
         function toggleCamera() {
             useFrontCamera = !useFrontCamera;
-            if (video.srcObject) {
-                video.srcObject.getTracks().forEach(track => track.stop());
-            }
+            stopWebcam();
             startWebcam();
         }
 
         async function detectFaces() {
-            if (!faceMatcher || video.paused || video.ended) {
-                isDetecting = false; return;
+            if (document.hidden || !mediaStream || !faceMatcher || video.paused || video.ended) {
+                isDetecting = false; 
+                return;
             }
 
             const detectorOptions = new faceapi.TinyFaceDetectorOptions({ scoreThreshold: 0.65 });
@@ -288,6 +345,12 @@
                             });
                             drawBox.draw(overlay);
 
+                            // Kiểm tra nếu người này chuẩn bị được gửi dữ liệu (vượt qua bộ lọc thời gian 15s) thì phát âm thanh
+                            const now = Date.now();
+                            if (!lastSentLog[personData.mnv] || (now - lastSentLog[personData.mnv]) >= 15000) {
+                                playSuccessSound(); // Phát âm thanh báo hiệu nhận diện thành công
+                            }
+
                             sendToGoogleSheet(personData);
 
                         } catch (e) { console.error(e); }
@@ -317,7 +380,6 @@
                 resultCard.classList.remove('active');
             }
 
-            // Đồng bộ nhịp khung hình ổn định, không gây giật lag
             requestAnimationFrame(detectFaces);
         }
 
@@ -328,6 +390,15 @@
             if (!isDetecting) {
                 isDetecting = true;
                 detectFaces();
+            }
+        });
+
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                stopWebcam();
+                isDetecting = false;
+            } else {
+                startWebcam();
             }
         });
 
