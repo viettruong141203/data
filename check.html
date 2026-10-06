@@ -39,7 +39,6 @@
             gap: 16px;
         }
 
-        /* Khu vực Camera */
         .scanner-container {
             position: relative;
             width: 100%;
@@ -61,13 +60,11 @@
             z-index: 10;
         }
 
-        /* Thêm class mirror để lật camera trước, camera sau sẽ không gọi class này */
         .mirror {
             transform: scaleX(-1);
             -webkit-transform: scaleX(-1);
         }
 
-        /* Tia quét */
         .scan-line {
             position: absolute;
             width: 100%; height: 3px;
@@ -84,7 +81,6 @@
             100% { top: 100%; opacity: 0; }
         }
 
-        /* Nút lật camera */
         .camera-btn {
             position: absolute; top: 12px; right: 12px;
             width: 40px; height: 40px;
@@ -94,7 +90,6 @@
             z-index: 15; border: none; cursor: pointer; color: white;
         }
 
-        /* Thẻ kết quả */
         .result-wrapper {
             min-height: 80px; 
             display: flex;
@@ -175,11 +170,12 @@
         let useFrontCamera = true;
         let scanTimeout = null;
 
+        // Định dạng lại link Google Drive chính xác theo yêu cầu
         function getDirectDriveUrl(url) {
             if (!url) return 'https://i.imgur.com/6VBx3io.png';
             const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
             if (match && match[1]) {
-                return `https://drive.google.com/uc?id=${match[1]}`;
+                return `https://drive.google.com/uc?export=view&id=${match[1]}`;
             }
             return url;
         }
@@ -220,7 +216,6 @@
         function startWebcam() {
             const facingMode = useFrontCamera ? 'user' : 'environment';
             
-            // XỬ LÝ LẬT CAMERA: Chỉ lật ảnh (mirror) nếu đang dùng camera trước
             if (useFrontCamera) {
                 video.classList.add('mirror');
                 overlay.classList.add('mirror');
@@ -266,25 +261,23 @@
                     const match = faceMatcher.findBestMatch(detection.descriptor);
                     const box = detection.detection.box;
 
-                    let drawLabel = "Không xác định";
-                    let boxColor = "#ff5252";
-
+                    // CHỈ VẼ KHUNG NẾU LÀ NGƯỜI QUEN (KHÁC 'unknown')
                     if (match.label !== 'unknown') {
-                        boxColor = "#00bfa5";
                         try {
                             const personData = JSON.parse(match.label);
-                            drawLabel = personData.name;
                             matchedPerson = personData; 
+                            
+                            // Vẽ khung xanh bám theo khuôn mặt
+                            const drawBox = new faceapi.draw.DrawBox(box, { 
+                                label: personData.name, 
+                                lineWidth: 2, 
+                                boxColor: "#00bfa5",
+                                drawLabelOptions: { fontSize: 14, fontColor: '#fff', backgroundColor: "#00bfa5", padding: 4 }
+                            });
+                            drawBox.draw(overlay);
                         } catch (e) { console.error(e); }
                     }
-
-                    const drawBox = new faceapi.draw.DrawBox(box, { 
-                        label: drawLabel, 
-                        lineWidth: 2, 
-                        boxColor: boxColor,
-                        drawLabelOptions: { fontSize: 14, fontColor: '#fff', backgroundColor: boxColor, padding: 4 }
-                    });
-                    drawBox.draw(overlay);
+                    // Người lạ ('unknown') sẽ bị bỏ qua, không vẽ khung hay cảnh báo gì cả.
                 });
             }
 
