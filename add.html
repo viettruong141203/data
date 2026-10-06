@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Face ID - Đăng Ký Nhân Sự</title>
+  <title>Face ID - Đăng Ký Nhân Sự (Turbo AI)</title>
   
   <script defer src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -108,7 +108,7 @@
       <button class="btn btn-primary" onclick="goToScanSection()">Bắt đầu quét khuôn mặt →</button>
     </div>
 
-    <!-- PHẦN 2: TỰ ĐỘNG QUÉT 1.2S NGAY LẬP TỨC -->
+    <!-- PHẦN 2: TURBO AI QUÉT LIÊN TỤC -->
     <div id="section-scan" class="section-card">
       <div class="camera-container" id="container">
         <button class="icon-btn" onclick="switchCamera()" title="Đổi camera">
@@ -124,7 +124,7 @@
         <video id="video" autoplay muted playsinline></video>
       </div>
 
-      <div id="status-box" class="status-box">Đang khởi động camera...</div>
+      <div id="status-box" class="status-box">Đang khởi động Turbo AI...</div>
 
       <div class="progress-container">
         <div id="progress-bar" class="progress-bar"></div>
@@ -143,7 +143,7 @@
     let currentFacingMode = "user";
     let isAiLoaded = false;
     let scanTimer = 0; 
-    let scanInterval = null;
+    let isScanningActive = false;
     let collectedDescriptors = []; 
 
     const video = document.getElementById('video');
@@ -188,7 +188,9 @@
     }
 
     function backToInfoSection() {
-      stopScanProcess();
+      isScanningActive = false;
+      scanTimer = 0;
+      progressBar.style.width = '0%';
       if (currentStream) currentStream.getTracks().forEach(t => t.stop());
       
       sectionScan.style.display = 'none';
@@ -201,15 +203,17 @@
 
       try {
         currentStream = await navigator.mediaDevices.getUserMedia({ 
-          video: { width: { ideal: 720 }, height: { ideal: 720 }, facingMode: facingMode } 
+          video: { width: { ideal: 640 }, height: { ideal: 640 }, facingMode: facingMode } 
         });
         video.srcObject = currentStream;
         video.className = facingMode === "user" ? "front-camera" : "back-camera";
         
         video.onloadedmetadata = () => {
           video.play();
-          // Kích hoạt vòng quét ngay lập tức
-          beginFaceCountdown(); 
+          isScanningActive = true;
+          scanTimer = 0;
+          collectedDescriptors = [];
+          runTurboDetectionLoop(); 
         };
       } catch(err) {
         alert("Không thể bật được Camera!");
@@ -217,65 +221,72 @@
     }
 
     function switchCamera() {
+      isScanningActive = false;
       currentFacingMode = (currentFacingMode === "user") ? "environment" : "user";
-      stopScanProcess();
       startCamera(currentFacingMode);
     }
 
-    function stopScanProcess() {
-      if (scanInterval) clearInterval(scanInterval);
-      scanTimer = 0;
-      progressBar.style.width = '0%';
-      guideCircle.classList.remove('active');
-    }
-
-    // VÒNG LẶP QUÉT 1.2S TRỰC TIẾP
-    function beginFaceCountdown() {
-      stopScanProcess();
-      collectedDescriptors = [];
-      
-      const options = new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.6 });
+    // 🚀 TURBO AI LOOP: TỐC ĐỘ XỬ LÝ SIÊU TỐC VÀ CHÍNH XÁC CAO
+    async function runTurboDetectionLoop() {
+      // Dùng inputSize: 320 giúp tăng tốc độ khung hình (FPS) mượt mà tối đa trên mọi thiết bị
+      const options = new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.5 });
       const targetTimeMs = 1200; // 1.2 giây
-      const intervalMs = 60;     
+      const frameIntervalMs = 30; // Quét dồn dập siêu nhanh (hơn 30 lần/giây)
+      let lastTime = Date.now();
 
       statusBox.innerText = "Giữ cố định mặt trong vòng tròn...";
       statusBox.style.color = "#4338CA";
 
-      scanInterval = setInterval(async () => {
-        if (!video || video.paused || video.ended) return;
+      const detectFrame = async () => {
+        if (!isScanningActive || video.paused || video.ended) return;
 
-        const detection = await faceapi.detectSingleFace(video, options).withFaceLandmarks().withFaceDescriptor();
+        const now = Date.now();
+        if (now - lastTime >= frameIntervalMs) {
+          lastTime = now;
 
-        if (detection) {
-          const box = detection.detection.box;
-          const videoCenter = { x: video.videoWidth / 2, y: video.videoHeight / 2 };
-          const faceCenter = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
-          const tolerance = 160; 
+          try {
+            const detection = await faceapi.detectSingleFace(video, options).withFaceLandmarks().withFaceDescriptor();
 
-          // Kiểm tra mặt nằm trong vòng tròn định vị trung tâm
-          if (Math.abs(faceCenter.x - videoCenter.x) < tolerance && Math.abs(faceCenter.y - videoCenter.y) < tolerance) {
-            scanTimer += intervalMs;
-            collectedDescriptors.push(detection.descriptor);
-            
-            const percent = (scanTimer / targetTimeMs) * 100;
-            progressBar.style.width = `${percent}%`;
-            guideCircle.classList.add('active');
-            statusBox.innerText = `Đang quét... ${(scanTimer/1000).toFixed(1)}s / 1.2s`;
+            if (detection) {
+              const box = detection.detection.box;
+              const videoCenter = { x: video.videoWidth / 2, y: video.videoHeight / 2 };
+              const faceCenter = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+              const tolerance = 180; // Vùng dung sai rộng rãi giúp người dùng dễ căn chỉnh
 
-            if (scanTimer >= targetTimeMs) {
-              stopScanProcess();
-              statusBox.innerText = "✨ Đang lưu thông tin...";
-              statusBox.style.color = "#10B981";
-              
-              executeSaveData();
+              if (Math.abs(faceCenter.x - videoCenter.x) < tolerance && Math.abs(faceCenter.y - videoCenter.y) < tolerance) {
+                scanTimer += frameIntervalMs;
+                collectedDescriptors.push(detection.descriptor);
+                
+                const percent = Math.min(100, (scanTimer / targetTimeMs) * 100);
+                progressBar.style.width = `${percent}%`;
+                guideCircle.classList.add('active');
+                statusBox.innerText = `Đang quét... ${(scanTimer/1000).toFixed(1)}s / 1.2s`;
+
+                if (scanTimer >= targetTimeMs) {
+                  isScanningActive = false;
+                  statusBox.innerText = "✨ Đang lưu thông tin...";
+                  statusBox.style.color = "#10B981";
+                  
+                  executeSaveData();
+                  return; 
+                }
+              } else {
+                resetCountdown("⚠️ Vui lòng giữ mặt ở giữa vòng tròn");
+              }
+            } else {
+              resetCountdown("🔍 Đang tìm kiếm khuôn mặt...");
             }
-          } else {
-            resetCountdown("⚠️ Vui lòng giữ mặt ở giữa vòng tròn");
+          } catch (err) {
+            console.error("AI frame error:", err);
           }
-        } else {
-          resetCountdown("🔍 Đang tìm kiếm khuôn mặt...");
         }
-      }, intervalMs);
+
+        if (isScanningActive) {
+          requestAnimationFrame(detectFrame);
+        }
+      };
+
+      requestAnimationFrame(detectFrame);
     }
 
     function resetCountdown(msg) {
@@ -290,6 +301,7 @@
     }
 
     function getAverageDescriptor(descriptors) {
+      if (descriptors.length === 0) return [];
       const len = descriptors[0].length;
       const avg = new Float32Array(len);
       for (let i = 0; i < len; i++) {
