@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Face ID</title>
+    <title>AI Professional Face Scanner</title>
     <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.min.js"></script>
     <style>
@@ -167,12 +167,14 @@
         const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/';
         
         let faceMatcher = null;
-        let isDetecting = false;
+        let isRunning = false;
         let useFrontCamera = true;
         let scanTimeout = null;
         let mediaStream = null;
         let audioCtx = null;
-        let lastDetectedMnv = null; // Biến ghi nhớ nhân sự vừa quét được để tránh kêu bíp liên tục
+        let lastDetectedMnv = null;
+        let lastProcessingTime = 0;
+        const FRAME_INTERVAL = 120; // Giới hạn khoảng cách giữa các khung hình AI để máy chạy siêu mượt (ổn định như thiết bị chuyên dụng)
 
         function playSuccessSound() {
             try {
@@ -278,99 +280,105 @@
             startWebcam();
         }
 
-        async function detectFaces() {
-            if (document.hidden || !mediaStream || !faceMatcher || video.paused || video.ended) {
-                isDetecting = false; 
+        async function detectFaces(timestamp) {
+            if (!isRunning || document.hidden || !mediaStream || !faceMatcher || video.paused || video.ended) {
                 return;
             }
 
-            const detectorOptions = new faceapi.TinyFaceDetectorOptions({ scoreThreshold: 0.65 });
-            const detections = await faceapi.detectAllFaces(video, detectorOptions)
-                .withFaceLandmarks()
-                .withFaceDescriptors();
+            // Cơ chế điều tiết nhịp khung hình giúp máy chạy cực kỳ ổn định, không giật lag
+            if (timestamp - lastProcessingTime >= FRAME_INTERVAL) {
+                lastProcessingTime = timestamp;
 
-            const displaySize = { width: video.clientWidth, height: video.clientHeight };
-            const resizedDetections = faceapi.resizeResults(detections, displaySize);
-            
-            const ctx = overlay.getContext('2d');
-            ctx.clearRect(0, 0, overlay.width, overlay.height);
+                const detectorOptions = new faceapi.TinyFaceDetectorOptions({ scoreThreshold: 0.65 });
+                const detections = await faceapi.detectAllFaces(video, detectorOptions)
+                    .withFaceLandmarks()
+                    .withFaceDescriptors();
 
-            let matchedPerson = null;
-
-            if (resizedDetections.length > 0) {
-                resizedDetections.forEach(detection => {
-                    const match = faceMatcher.findBestMatch(detection.descriptor);
-                    const box = detection.detection.box;
-
-                    if (match.label !== 'unknown') {
-                        try {
-                            const personData = JSON.parse(match.label);
-                            matchedPerson = personData; 
-                            
-                            const drawBox = new faceapi.draw.DrawBox(box, { 
-                                label: personData.name, 
-                                lineWidth: 2, 
-                                boxColor: "#00bfa5",
-                                drawLabelOptions: { fontSize: 14, fontColor: '#fff', backgroundColor: "#00bfa5", padding: 4 }
-                            });
-                            drawBox.draw(overlay);
-
-                            // Chỉ phát âm thanh bíp MỘT LẦN duy nhất khi chuyển sang nhận diện người mới hoặc sau khi hết thời gian chờ
-                            if (lastDetectedMnv !== personData.mnv) {
-                                playSuccessSound();
-                                lastDetectedMnv = personData.mnv;
-                            }
-
-                        } catch (e) { console.error(e); }
-                    }
-                });
-            } else {
-                // Nếu không nhìn thấy khuôn mặt nào trong khung hình, reset lại bộ nhớ để lần sau quét lại sẽ kêu bíp tiếp
-                lastDetectedMnv = null;
-            }
-
-            if (matchedPerson) {
-                resultCard.classList.add('active');
-                document.getElementById('res-mnv').innerText = matchedPerson.mnv;
-                document.getElementById('res-name').innerText = matchedPerson.name;
+                const displaySize = { width: video.clientWidth, height: video.clientHeight };
+                const resizedDetections = faceapi.resizeResults(detections, displaySize);
                 
-                if(matchedPerson.driveUrl) {
-                    const newImgSrc = getDirectDriveUrl(matchedPerson.driveUrl);
-                    const currentImgSrc = document.getElementById('res-avatar').src;
-                    if (currentImgSrc !== newImgSrc) {
-                        document.getElementById('res-avatar').src = newImgSrc;
-                    }
+                const ctx = overlay.getContext('2d');
+                ctx.clearRect(0, 0, overlay.width, overlay.height);
+
+                let matchedPerson = null;
+
+                if (resizedDetections.length > 0) {
+                    resizedDetections.forEach(detection => {
+                        const match = faceMatcher.findBestMatch(detection.descriptor);
+                        const box = detection.detection.box;
+
+                        if (match.label !== 'unknown') {
+                            try {
+                                const personData = JSON.parse(match.label);
+                                matchedPerson = personData; 
+                                
+                                const drawBox = new faceapi.draw.DrawBox(box, { 
+                                    label: personData.name, 
+                                    lineWidth: 2, 
+                                    boxColor: "#00bfa5",
+                                    drawLabelOptions: { fontSize: 14, fontColor: '#fff', backgroundColor: "#00bfa5", padding: 4 }
+                                });
+                                drawBox.draw(overlay);
+
+                                if (lastDetectedMnv !== personData.mnv) {
+                                    playSuccessSound();
+                                    lastDetectedMnv = personData.mnv;
+                                }
+
+                            } catch (e) { console.error(e); }
+                        }
+                    });
+                } else {
+                    lastDetectedMnv = null;
                 }
-                
-                clearTimeout(scanTimeout);
-                scanTimeout = setTimeout(() => {
-                    resultCard.classList.remove('active');
-                    lastDetectedMnv = null; // Cho phép quét lại người cũ sau khi ẩn thẻ kết quả
-                }, 2000);
 
-            } else if (!scanTimeout) {
-                resultCard.classList.remove('active');
+                if (matchedPerson) {
+                    resultCard.classList.add('active');
+                    document.getElementById('res-mnv').innerText = matchedPerson.mnv;
+                    document.getElementById('res-name').innerText = matchedPerson.name;
+                    
+                    if(matchedPerson.driveUrl) {
+                        const newImgSrc = getDirectDriveUrl(matchedPerson.driveUrl);
+                        const currentImgSrc = document.getElementById('res-avatar').src;
+                        if (currentImgSrc !== newImgSrc) {
+                            document.getElementById('res-avatar').src = newImgSrc;
+                        }
+                    }
+                    
+                    clearTimeout(scanTimeout);
+                    scanTimeout = setTimeout(() => {
+                        resultCard.classList.remove('active');
+                        lastDetectedMnv = null;
+                    }, 2000);
+
+                } else if (!scanTimeout) {
+                    resultCard.classList.remove('active');
+                }
             }
 
-            requestAnimationFrame(detectFaces);
+            if (isRunning) {
+                requestAnimationFrame(detectFaces);
+            }
         }
 
         video.addEventListener('play', () => {
             overlay.width = video.clientWidth;
             overlay.height = video.clientHeight;
             
-            if (!isDetecting) {
-                isDetecting = true;
-                detectFaces();
+            if (!isRunning) {
+                isRunning = true;
+                requestAnimationFrame(detectFaces);
             }
         });
 
         document.addEventListener('visibilitychange', () => {
             if (document.hidden) {
+                isRunning = false;
                 stopWebcam();
-                isDetecting = false;
             } else {
+                isRunning = true;
                 startWebcam();
+                requestAnimationFrame(detectFaces);
             }
         });
 
