@@ -52,15 +52,16 @@
     }
     @keyframes spin { 100% { transform: rotate(360deg); } }
 
+    /* Nút đổi camera trong suốt hoàn toàn */
     .icon-btn {
       position: absolute; top: 16px; right: 16px; width: 46px; height: 46px;
-      background: rgba(0, 0, 0, 0.3); color: #FFFFFF; border: 1px solid rgba(255, 255, 255, 0.3);
-      border-radius: 50%; display: flex; align-items: center; justify-content: center;
-      cursor: pointer; backdrop-filter: blur(10px); z-index: 30;
-      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      background: transparent; color: #FFFFFF; border: none; outline: none;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; z-index: 30; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
-    .icon-btn:hover { background: rgba(0, 0, 0, 0.5); transform: scale(1.05) rotate(180deg); }
-    .icon-btn svg { width: 22px; height: 22px; stroke: currentColor; }
+    .icon-btn:hover { transform: scale(1.15) rotate(180deg); }
+    /* Thêm shadow cho chính icon để không bị lẫn vào nền camera sáng */
+    .icon-btn svg { width: 28px; height: 28px; stroke: currentColor; filter: drop-shadow(0px 2px 5px rgba(0,0,0,0.7)); }
 
     /* Hộp Thông Tin (Luôn chừa khoảng trống) */
     .info-box {
@@ -70,11 +71,7 @@
       opacity: 1; visibility: visible;
     }
     
-    /* Trạng thái Tàng hình: Chừa khoảng trống nhưng không hiển thị nội dung */
-    .info-box.hide {
-      opacity: 0; 
-      visibility: hidden; 
-    }
+    .info-box.hide { opacity: 0; visibility: hidden; }
 
     .info-box.scanning { background: #EEF2FF; border-color: #C7D2FE; box-shadow: 0 8px 16px rgba(99, 102, 241, 0.1); }
     .info-box.scanning .info-visual { background: #6366F1; box-shadow: 0 0 15px rgba(99, 102, 241, 0.4); }
@@ -105,13 +102,11 @@
   <div class="app-card" id="app-card">
     <div class="camera-container" id="container">
       
-      <!-- Lớp phủ Đang tải dữ liệu -->
       <div id="loading-overlay" class="loading-overlay">
         <div class="spinner"></div>
         <span>Đang tải dữ liệu...</span>
       </div>
 
-      <!-- Nút đổi camera (Mặc định ẩn) -->
       <button id="btn-switch" class="icon-btn" onclick="switchCamera()" title="Đổi camera" style="display: none;">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
           <path d="M20 9V7a2 2 0 0 0-2-2h-3.28a2 2 0 0 1-1.34-.53l-1.06-1.06A2 2 0 0 0 10.9 3H7a2 2 0 0 0-2 2v4"></path>
@@ -125,7 +120,6 @@
       <video id="video" autoplay muted playsinline></video>
     </div>
 
-    <!-- Hộp thông tin (Mặc định ở trạng thái tàng hình 'hide' để chừa khoảng trống) -->
     <div id="info-box" class="info-box hide">
       <div id="info-visual" class="info-visual">
         <div id="info-icon" class="info-icon">⏳</div>
@@ -150,6 +144,10 @@
     let employeeData = {};
     let lastScanLabel = ""; 
 
+    // Các cờ để kiểm soát việc tải song song
+    let isDataReady = false;
+    let isCameraReady = false;
+
     const video = document.getElementById('video');
     const container = document.getElementById('container');
     const loadingOverlay = document.getElementById('loading-overlay');
@@ -167,7 +165,6 @@
       return match ? `https://drive.google.com/thumbnail?id=${match[0]}&sz=w200-h200-c` : url;
     }
 
-    // Logic UI: Ẩn/Hiện bằng Class để chừa không gian cố định
     function updateStatusUI(state, icon, title, subtitle, avatarUrl = null) {
       if (state === 'hide') {
         infoBox.className = 'info-box hide';
@@ -200,56 +197,14 @@
       }
     }
 
-    async function loadModels() {
-      const MODEL_URL = 'https://justadudewhohacks.github.io/face-api.js/models';
-      try {
-        await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
-        await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
-        await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
-        
-        startCamera(currentFacingMode);
-      } catch (e) {
-        loadingOverlay.style.display = 'none';
-        updateStatusUI('danger', '❌', 'Không thể tải AI', 'Lỗi Mạng');
-      }
-    }
-
-    async function startCamera(facingMode) {
-      stopCamera();
+    // --- TẢI SONG SONG CẢ AI VÀ DỮ LIỆU ---
+    window.onload = () => {
       loadingOverlay.style.display = 'flex';
-      
-      try {
-        const constraints = { video: { width: { ideal: 1080 }, height: { ideal: 1920 }, facingMode: facingMode } };
-        currentStream = await navigator.mediaDevices.getUserMedia(constraints);
-        video.srcObject = currentStream;
-
-        video.className = facingMode === "user" ? "front-camera" : "back-camera";
-        if (canvas) canvas.className = video.className;
-        
-        video.onloadedmetadata = () => {
-          video.play();
-          if (!canvas) {
-            canvas = faceapi.createCanvasFromMedia(video);
-            container.append(canvas);
-          }
-          displaySize = { width: video.videoWidth, height: video.videoHeight };
-          faceapi.matchDimensions(canvas, displaySize);
-
-          if (!faceMatcher) loadDataFromAppsScript();
-          else startSmoothRecognition();
-        };
-      } catch (err) {
-        loadingOverlay.style.display = 'none';
-        updateStatusUI('danger', '📷', 'Vui lòng cấp quyền', 'Lỗi Camera');
-      }
+      loadModelsAndCamera();
+      fetchDatabaseAsync(); // Bắt đầu lấy dữ liệu Google Sheets ngay lập tức mà không cần chờ Camera
     }
 
-    function switchCamera() {
-      currentFacingMode = (currentFacingMode === "user") ? "environment" : "user";
-      startCamera(currentFacingMode);
-    }
-
-    async function loadDataFromAppsScript() {
+    async function fetchDatabaseAsync() {
       try {
         const response = await fetch(SCRIPT_URL);
         const result = await response.json();
@@ -272,26 +227,84 @@
           
           if (labeledFaceDescriptors.length > 0) {
             faceMatcher = new faceapi.FaceMatcher(labeledFaceDescriptors, 0.38);
-            startSmoothRecognition();
-          } else {
-            loadingOverlay.style.display = 'none';
-            btnSwitch.style.display = 'flex';
-            updateStatusUI('scanning', '⏳', 'Hệ thống sẵn sàng', 'Chưa có nhân sự');
           }
         }
-      } catch (error) { 
-        loadingOverlay.style.display = 'none';
-        updateStatusUI('danger', '🔌', 'Lỗi kết nối máy chủ', 'Hệ Thống'); 
+      } catch (error) {
+        console.error("Lỗi lấy dữ liệu:", error);
       }
+      // Dữ liệu đã tải xong (dù thành công hay lỗi cũng đánh dấu xong)
+      isDataReady = true;
+      checkAndStartApp();
+    }
+
+    async function loadModelsAndCamera() {
+      const MODEL_URL = 'https://justadudewhohacks.github.io/face-api.js/models';
+      try {
+        await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+        await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
+        await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
+        
+        startCamera(currentFacingMode);
+      } catch (e) {
+        loadingOverlay.style.display = 'none';
+        updateStatusUI('danger', '❌', 'Không thể tải AI', 'Lỗi Mạng');
+      }
+    }
+
+    async function startCamera(facingMode) {
+      stopCamera();
+      isCameraReady = false;
+      
+      try {
+        const constraints = { video: { width: { ideal: 1080 }, height: { ideal: 1920 }, facingMode: facingMode } };
+        currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+        video.srcObject = currentStream;
+
+        video.className = facingMode === "user" ? "front-camera" : "back-camera";
+        if (canvas) canvas.className = video.className;
+        
+        video.onloadedmetadata = () => {
+          video.play();
+          if (!canvas) {
+            canvas = faceapi.createCanvasFromMedia(video);
+            container.append(canvas);
+          }
+          displaySize = { width: video.videoWidth, height: video.videoHeight };
+          faceapi.matchDimensions(canvas, displaySize);
+
+          // Đánh dấu camera đã sẵn sàng
+          isCameraReady = true;
+          checkAndStartApp();
+        };
+      } catch (err) {
+        loadingOverlay.style.display = 'none';
+        updateStatusUI('danger', '📷', 'Vui lòng cấp quyền', 'Lỗi Camera');
+      }
+    }
+
+    // Hàm tổng: Đợi cả Camera và Data tải xong thì mới ẩn Loading và mở quét
+    function checkAndStartApp() {
+      if (isDataReady && isCameraReady) {
+        loadingOverlay.style.display = 'none';
+        btnSwitch.style.display = 'flex';
+        
+        if (faceMatcher) {
+          startSmoothRecognition();
+        } else {
+          updateStatusUI('scanning', '⏳', 'Hệ thống sẵn sàng', 'Chưa có nhân sự');
+        }
+      }
+    }
+
+    function switchCamera() {
+      loadingOverlay.style.display = 'flex'; // Tạm hiện loading khi xoay camera
+      btnSwitch.style.display = 'none';
+      currentFacingMode = (currentFacingMode === "user") ? "environment" : "user";
+      startCamera(currentFacingMode);
     }
 
     async function startSmoothRecognition() {
       isRunning = true;
-      
-      loadingOverlay.style.display = 'none'; 
-      btnSwitch.style.display = 'flex';
-      
-      // Ở trạng thái bình thường (khi đang quét) -> Làm tàng hình hộp thoại bên dưới
       updateStatusUI('hide');
 
       const options = new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.6 });
@@ -304,7 +317,6 @@
           ctx.clearRect(0, 0, canvas.width, canvas.height);
 
           if (!detection) {
-            // Không có mặt -> Chuyển về chế độ Tàng hình
             if (lastScanLabel !== "scanning") {
               updateStatusUI('hide');
               lastScanLabel = "scanning";
@@ -316,20 +328,17 @@
             const isStranger = bestMatch.label === "unknown";
 
             if (isStranger) {
-              // Là người lạ -> Lơ đi, tiếp tục chế độ Tàng hình
               if (lastScanLabel !== "scanning") {
                 updateStatusUI('hide');
                 lastScanLabel = "scanning";
               }
             } else {
-              // Khung nhận diện vẽ màu xanh
               const drawBox = new faceapi.draw.DrawBox(box, {
                 boxColor: "#10B981", 
                 lineWidth: 3
               });
               drawBox.draw(canvas);
 
-              // Nhận diện ĐÚNG người -> Hộp thông tin Mượt mà hiện lên
               if (lastScanLabel !== bestMatch.label) {
                 lastScanLabel = bestMatch.label;
                 const emp = employeeData[bestMatch.label];
@@ -352,10 +361,10 @@
           const ctx = canvas.getContext('2d');
           ctx.clearRect(0, 0, canvas.width, canvas.height);
         }
-        // Khi thu nhỏ trình duyệt, hiện hộp thông báo báo tạm dừng
         updateStatusUI('scanning', '⏸️', 'Đã tạm dừng camera', 'Hệ Thống');
       } else {
-        if (faceMatcher) {
+        if (isDataReady) {
+          loadingOverlay.style.display = 'flex';
           startCamera(currentFacingMode);
         }
       }
@@ -365,7 +374,6 @@
       stopCamera();
     });
 
-    window.onload = loadModels;
   </script>
 </body>
 </html>
