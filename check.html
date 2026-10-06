@@ -2,9 +2,10 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Face Scanner - GitHub Interface</title>
-    <script defer src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.min.js"></script>
+    <!-- Tải thư viện face-api trực tiếp, không dùng defer để tránh lỗi is not defined -->
+    <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.min.js"></script>
     <style>
         /* GitHub Dark Theme Variables */
         :root {
@@ -19,6 +20,8 @@
             --gh-danger: #da3633;
             --gh-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
         }
+
+        * { box-sizing: border-box; }
 
         body {
             margin: 0; padding: 20px;
@@ -73,8 +76,6 @@
             position: relative;
             width: 100%;
             background: #000;
-            display: flex;
-            justify-content: center;
         }
         video {
             width: 100%; height: auto;
@@ -84,7 +85,7 @@
         canvas {
             position: absolute;
             top: 0; left: 0;
-            width: 100%; height: 100%;
+            width: 100%; height: 100%; /* Căn canvas phủ kín video */
             object-fit: cover;
         }
 
@@ -118,10 +119,6 @@
         .result-row:last-child { border-bottom: none; }
         .result-row span.label { color: var(--gh-muted); }
         .result-row span.value { color: var(--gh-heading); font-weight: 600; }
-        .avatar-placeholder {
-            width: 48px; height: 48px; border-radius: 50%;
-            background: var(--gh-border); margin-bottom: 12px;
-        }
     </style>
 </head>
 <body>
@@ -135,11 +132,8 @@
         <div class="content-grid">
             <!-- Khu vực Camera -->
             <div class="box">
-                <div class="box-header">
-                    Live Camera Feed
-                </div>
+                <div class="box-header">Live Camera Feed</div>
                 <div class="video-wrapper">
-                    <!-- Thuộc tính playsinline bắt buộc để chạy trên iOS Safari -->
                     <video id="video" autoplay muted playsinline></video>
                     <canvas id="overlay"></canvas>
                 </div>
@@ -150,13 +144,12 @@
                 <div class="box">
                     <div class="box-header">System Status</div>
                     <div style="padding: 16px;">
-                        <span id="status" class="status-badge status-loading">Khởi tạo môi trường...</span>
+                        <span id="status" class="status-badge status-loading">Đang chờ khởi động...</span>
                     </div>
                 </div>
 
                 <!-- Kết quả hiển thị -->
                 <div id="resultCard" class="result-card">
-                    <div class="avatar-placeholder"></div>
                     <h3>Nhân sự định danh</h3>
                     <div class="result-row">
                         <span class="label">Mã NV:</span>
@@ -181,8 +174,8 @@
         const statusEl = document.getElementById('status');
         const resultCard = document.getElementById('resultCard');
         
+        // Link API của bạn
         const API_URL = 'https://script.google.com/macros/s/AKfycbzwoSShI37Pg6P4GhIYSwpcGkN_LeO0fLldHWBvYyz96PFx_qCAfV7IE3mBxFheZXrDNQ/exec';
-        // Dùng models từ CDN để load nhanh trên GitHub Pages
         const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/';
         
         let faceMatcher = null;
@@ -195,6 +188,11 @@
 
         async function init() {
             try {
+                // Kiểm tra thư viện đã tải thành công chưa
+                if (typeof faceapi === 'undefined') {
+                    throw new Error("Thư viện nhận diện chưa được tải.");
+                }
+
                 updateStatus('Đang tải mô hình AI...', 'status-loading');
                 await Promise.all([
                     faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL),
@@ -213,10 +211,10 @@
                         return new faceapi.LabeledFaceDescriptors(labelData, [float32Array]);
                     });
 
-                    // Ngưỡng 0.45. Càng thấp nhận diện càng khắt khe.
+                    // 0.45 là ngưỡng sai số. Nếu nhận diện nhầm người, hãy giảm xuống 0.40
                     faceMatcher = new faceapi.FaceMatcher(labeledDescriptors, 0.45);
                     
-                    updateStatus(`Ready (${result.total} users)`, 'status-loading');
+                    updateStatus(`Sẵn sàng (${result.total} nhân sự)`, 'status-success');
                     startWebcam();
                 } else {
                     updateStatus('API không có dữ liệu', 'status-error');
@@ -228,24 +226,17 @@
         }
 
         function startWebcam() {
-            // Yêu cầu camera hướng về phía trước (user), phù hợp trên mobile
             navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } })
                 .then(stream => {
                     video.srcObject = stream;
-                    updateStatus('Camera Active', 'status-success');
                 })
                 .catch(err => {
                     updateStatus('Bị từ chối quyền Camera', 'status-error');
                 });
         }
 
-        video.addEventListener('loadedmetadata', () => {
-            // Cài đặt độ phân giải nội bộ của canvas khớp với độ phân giải gốc của video
-            overlay.width = video.videoWidth;
-            overlay.height = video.videoHeight;
-        });
-
         video.addEventListener('play', () => {
+            // Lấy độ phân giải gốc của camera
             const displaySize = { width: video.videoWidth, height: video.videoHeight };
             faceapi.matchDimensions(overlay, displaySize);
 
@@ -273,15 +264,15 @@
                     const box = detection.detection.box;
 
                     let drawLabel = "Unknown";
-                    let boxColor = "#da3633"; // Red for GitHub Theme Danger
+                    let boxColor = "#da3633"; // Màu đỏ GitHub
 
                     if (match.label !== 'unknown') {
-                        boxColor = "#3fb950"; // Green for GitHub Theme Success
+                        boxColor = "#3fb950"; // Màu xanh GitHub
                         try {
                             const personData = JSON.parse(match.label);
                             drawLabel = personData.name;
                             
-                            // Cập nhật giao diện Panel bên phải
+                            // Cập nhật thông tin vào Panel
                             resultCard.style.display = 'block';
                             document.getElementById('res-mnv').innerText = personData.mnv;
                             document.getElementById('res-name').innerText = personData.name;
@@ -294,7 +285,7 @@
                         resultCard.style.display = 'none';
                     }
 
-                    // Vẽ khung định vị lên luồng Video
+                    // Vẽ khung định vị
                     const drawBox = new faceapi.draw.DrawBox(box, { 
                         label: drawLabel, 
                         lineWidth: 2, 
@@ -308,10 +299,13 @@
                     });
                     drawBox.draw(overlay);
                 });
-            }, 150); // Tốc độ quét 150ms để tối ưu hiệu năng thiết bị di động
+            }, 150); // Quét mỗi 150ms
         });
 
-        init();
+        // BẮT BUỘC: Đợi toàn bộ trang web (bao gồm thư viện) tải xong mới chạy hàm init()
+        window.addEventListener('load', () => {
+            init();
+        });
     </script>
 </body>
 </html>
