@@ -65,22 +65,6 @@
             -webkit-transform: scaleX(-1);
         }
 
-        .scan-line {
-            position: absolute;
-            width: 100%; height: 3px;
-            background: rgba(0, 191, 165, 0.8);
-            box-shadow: 0 0 15px rgba(0, 191, 165, 0.8);
-            top: 0; left: 0; z-index: 12;
-            animation: scan 2.5s linear infinite;
-        }
-
-        @keyframes scan {
-            0% { top: 0%; opacity: 0; }
-            10% { opacity: 1; }
-            90% { opacity: 1; }
-            100% { top: 100%; opacity: 0; }
-        }
-
         .camera-btn {
             position: absolute; top: 12px; right: 12px;
             width: 40px; height: 40px;
@@ -134,7 +118,6 @@
         <div class="scanner-container">
             <video id="video" autoplay muted playsinline></video>
             <canvas id="overlay"></canvas>
-            <div class="scan-line"></div>
             
             <button class="camera-btn" onclick="toggleCamera()">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -232,10 +215,7 @@
                         return new faceapi.LabeledFaceDescriptors(labelData, [float32Array]);
                     });
 
-                    // BƯỚC 1: HẠ NGƯỠNG SAI SỐ (Khoảng cách Euclidean) XUỐNG 0.38
-                    // Hệ thống sẽ khắt khe hơn khi đối chiếu khuôn mặt, giảm triệt để tỷ lệ nhận diện nhầm
                     faceMatcher = new faceapi.FaceMatcher(labeledDescriptors, 0.38); 
-                    
                     statusMsg.style.display = 'none';
                     startWebcam();
                 } else {
@@ -258,7 +238,7 @@
             }
 
             navigator.mediaDevices.getUserMedia({ 
-                video: { facingMode: facingMode, width: { ideal: 720 }, height: { ideal: 960 } } 
+                video: { facingMode: facingMode, width: { ideal: 640 }, height: { ideal: 480 } } 
             })
             .then(stream => { video.srcObject = stream; })
             .catch(err => { statusMsg.innerText = 'Chưa cấp quyền Camera'; statusMsg.style.display = 'block'; });
@@ -277,10 +257,7 @@
                 isDetecting = false; return;
             }
 
-            // BƯỚC 2: TĂNG NGƯỠNG ĐỘ TIN CẬY KHUÔN MẶT (Score Threshold) LÊN 0.65
-            // Máy sẽ chỉ quét những khuôn mặt đủ sáng, rõ ràng và nhìn trực diện
             const detectorOptions = new faceapi.TinyFaceDetectorOptions({ scoreThreshold: 0.65 });
-            
             const detections = await faceapi.detectAllFaces(video, detectorOptions)
                 .withFaceLandmarks()
                 .withFaceDescriptors();
@@ -340,7 +317,8 @@
                 resultCard.classList.remove('active');
             }
 
-            setTimeout(() => { requestAnimationFrame(detectFaces); }, 80);
+            // Đồng bộ nhịp khung hình ổn định, không gây giật lag
+            requestAnimationFrame(detectFaces);
         }
 
         video.addEventListener('play', () => {
