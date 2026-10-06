@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI Professional Face Scanner</title>
+    <title>AI High-Accuracy Face Scanner</title>
     <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.min.js"></script>
     <style>
@@ -109,7 +109,7 @@
             opacity: 0; 
             visibility: hidden;
             transform: translateY(10px);
-            transition: all 0.3s ease-out;
+            transition: all 0.2s ease-out;
         }
 
         .result-card.active {
@@ -132,7 +132,7 @@
 
     <div class="main-card">
         <div class="scanner-container">
-            <div id="status-msg">Đang khởi tạo hệ thống...</div>
+            <div id="status-msg">Đang khởi tạo hệ thống AI...</div>
 
             <video id="video" autoplay muted playsinline></video>
             <canvas id="overlay"></canvas>
@@ -169,12 +169,9 @@
         let faceMatcher = null;
         let isRunning = false;
         let useFrontCamera = true;
-        let scanTimeout = null;
         let mediaStream = null;
         let audioCtx = null;
         let lastDetectedMnv = null;
-        let lastProcessingTime = 0;
-        const FRAME_INTERVAL = 120; // Giới hạn khoảng cách giữa các khung hình AI để máy chạy siêu mượt (ổn định như thiết bị chuyên dụng)
 
         function playSuccessSound() {
             try {
@@ -194,7 +191,7 @@
                 osc.start();
                 osc.stop(audioCtx.currentTime + 0.15);
             } catch (e) {
-                console.error("Không thể phát âm thanh", e);
+                console.error("Lỗi phát âm thanh:", e);
             }
         }
 
@@ -211,14 +208,14 @@
             try {
                 if (typeof faceapi === 'undefined') throw new Error("Chưa tải được thư viện AI.");
 
-                statusMsg.innerText = 'Đang nạp mô hình nhận diện...';
+                statusMsg.innerText = 'Đang nạp mô hình nhận diện thông minh...';
                 await Promise.all([
                     faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
                     faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
                     faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
                 ]);
 
-                statusMsg.innerText = 'Đang đồng bộ dữ liệu...';
+                statusMsg.innerText = 'Đang đồng bộ cơ sở dữ liệu...';
                 const response = await fetch(GET_DATA_URL);
                 const result = await response.json();
 
@@ -229,7 +226,8 @@
                         return new faceapi.LabeledFaceDescriptors(labelData, [float32Array]);
                     });
 
-                    faceMatcher = new faceapi.FaceMatcher(labeledDescriptors, 0.38); 
+                    // ĐẶT ĐỘ KHẮT KHE CAO (0.35) để AI nhận diện cực kỳ chính xác, tránh nhầm lẫn
+                    faceMatcher = new faceapi.FaceMatcher(labeledDescriptors, 0.35); 
                     statusMsg.style.display = 'none';
                     startWebcam();
                 } else {
@@ -280,80 +278,73 @@
             startWebcam();
         }
 
-        async function detectFaces(timestamp) {
+        // HÀM QUÉT AI LIÊN TỤC VỚI ĐỘ CHÍNH XÁC TỐI ĐA
+        async function detectFaces() {
             if (!isRunning || document.hidden || !mediaStream || !faceMatcher || video.paused || video.ended) {
                 return;
             }
 
-            // Cơ chế điều tiết nhịp khung hình giúp máy chạy cực kỳ ổn định, không giật lag
-            if (timestamp - lastProcessingTime >= FRAME_INTERVAL) {
-                lastProcessingTime = timestamp;
+            // Tăng độ tin cậy nhận diện khuôn mặt (scoreThreshold: 0.70) đảm bảo chỉ quét mặt rõ nét
+            const detectorOptions = new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.70 });
+            
+            // Trích xuất đầy đủ Landmarks (68 điểm cấu trúc mặt) và Face Descriptors để độ chính xác đạt mức cao nhất
+            const detections = await faceapi.detectAllFaces(video, detectorOptions)
+                .withFaceLandmarks()
+                .withFaceDescriptors();
 
-                const detectorOptions = new faceapi.TinyFaceDetectorOptions({ scoreThreshold: 0.65 });
-                const detections = await faceapi.detectAllFaces(video, detectorOptions)
-                    .withFaceLandmarks()
-                    .withFaceDescriptors();
+            const displaySize = { width: video.clientWidth, height: video.clientHeight };
+            const resizedDetections = faceapi.resizeResults(detections, displaySize);
+            
+            const ctx = overlay.getContext('2d');
+            ctx.clearRect(0, 0, overlay.width, overlay.height);
 
-                const displaySize = { width: video.clientWidth, height: video.clientHeight };
-                const resizedDetections = faceapi.resizeResults(detections, displaySize);
-                
-                const ctx = overlay.getContext('2d');
-                ctx.clearRect(0, 0, overlay.width, overlay.height);
+            let matchedPerson = null;
 
-                let matchedPerson = null;
+            if (resizedDetections.length > 0) {
+                resizedDetections.forEach(detection => {
+                    const match = faceMatcher.findBestMatch(detection.descriptor);
+                    const box = detection.detection.box;
 
-                if (resizedDetections.length > 0) {
-                    resizedDetections.forEach(detection => {
-                        const match = faceMatcher.findBestMatch(detection.descriptor);
-                        const box = detection.detection.box;
+                    if (match.label !== 'unknown') {
+                        try {
+                            const personData = JSON.parse(match.label);
+                            matchedPerson = personData; 
+                            
+                            // Vẽ khung nhận diện chuẩn xác
+                            const drawBox = new faceapi.draw.DrawBox(box, { 
+                                label: personData.name, 
+                                lineWidth: 2, 
+                                boxColor: "#00bfa5",
+                                drawLabelOptions: { fontSize: 14, fontColor: '#fff', backgroundColor: "#00bfa5", padding: 4 }
+                            });
+                            drawBox.draw(overlay);
 
-                        if (match.label !== 'unknown') {
-                            try {
-                                const personData = JSON.parse(match.label);
-                                matchedPerson = personData; 
-                                
-                                const drawBox = new faceapi.draw.DrawBox(box, { 
-                                    label: personData.name, 
-                                    lineWidth: 2, 
-                                    boxColor: "#00bfa5",
-                                    drawLabelOptions: { fontSize: 14, fontColor: '#fff', backgroundColor: "#00bfa5", padding: 4 }
-                                });
-                                drawBox.draw(overlay);
+                            if (lastDetectedMnv !== personData.mnv) {
+                                playSuccessSound();
+                                lastDetectedMnv = personData.mnv;
+                            }
 
-                                if (lastDetectedMnv !== personData.mnv) {
-                                    playSuccessSound();
-                                    lastDetectedMnv = personData.mnv;
-                                }
-
-                            } catch (e) { console.error(e); }
-                        }
-                    });
-                } else {
-                    lastDetectedMnv = null;
-                }
-
-                if (matchedPerson) {
-                    resultCard.classList.add('active');
-                    document.getElementById('res-mnv').innerText = matchedPerson.mnv;
-                    document.getElementById('res-name').innerText = matchedPerson.name;
-                    
-                    if(matchedPerson.driveUrl) {
-                        const newImgSrc = getDirectDriveUrl(matchedPerson.driveUrl);
-                        const currentImgSrc = document.getElementById('res-avatar').src;
-                        if (currentImgSrc !== newImgSrc) {
-                            document.getElementById('res-avatar').src = newImgSrc;
-                        }
+                        } catch (e) { console.error(e); }
                     }
-                    
-                    clearTimeout(scanTimeout);
-                    scanTimeout = setTimeout(() => {
-                        resultCard.classList.remove('active');
-                        lastDetectedMnv = null;
-                    }, 2000);
+                });
+            } else {
+                lastDetectedMnv = null;
+            }
 
-                } else if (!scanTimeout) {
-                    resultCard.classList.remove('active');
+            if (matchedPerson) {
+                resultCard.classList.add('active');
+                document.getElementById('res-mnv').innerText = matchedPerson.mnv;
+                document.getElementById('res-name').innerText = matchedPerson.name;
+                
+                if(matchedPerson.driveUrl) {
+                    const newImgSrc = getDirectDriveUrl(matchedPerson.driveUrl);
+                    const currentImgSrc = document.getElementById('res-avatar').src;
+                    if (currentImgSrc !== newImgSrc) {
+                        document.getElementById('res-avatar').src = newImgSrc;
+                    }
                 }
+            } else {
+                resultCard.classList.remove('active');
             }
 
             if (isRunning) {
