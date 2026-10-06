@@ -13,7 +13,6 @@
       --bg-dark: #020617;
       --glass-bg: rgba(30, 41, 59, 0.6);
       --glass-border: rgba(255, 255, 255, 0.1);
-      --accent-glow: rgba(56, 189, 248, 0.4);
       --success-glow: rgba(52, 211, 153, 0.4);
       --text-main: #F8FAFC;
       --text-sub: #94A3B8;
@@ -49,6 +48,7 @@
       position: relative; width: 100%; aspect-ratio: 3 / 4; 
       background: #000; border-radius: 28px; overflow: hidden;
       box-shadow: 0 10px 30px rgba(0,0,0,0.5), inset 0 0 0 2px var(--glass-border);
+      display: flex; justify-content: center; align-items: center;
     }
 
     #video { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -59,7 +59,25 @@
     canvas.front-camera { transform: scaleX(-1); }
     canvas.back-camera { transform: scaleX(1); }
 
-    /* NÚT CAMERA PILL-SHAPED MỚI */
+    /* THÔNG BÁO TẢI DỮ LIỆU Ở GIỮA CAMERA */
+    #status-msg {
+      position: absolute;
+      z-index: 20;
+      background: rgba(15, 23, 42, 0.85);
+      color: #fff;
+      padding: 14px 28px;
+      border-radius: 30px;
+      font-size: 15px;
+      font-weight: 600;
+      text-align: center;
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+      max-width: 85%;
+      display: none;
+    }
+
+    /* NÚT CAMERA PILL-SHAPED MỚI VỚI ICON FLIP CAMERA */
     .camera-toggle-btn {
       position: absolute; top: 16px; right: 16px; 
       background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(10px);
@@ -79,42 +97,48 @@
     .camera-toggle-btn svg { width: 18px; height: 18px; stroke: currentColor; transition: transform 0.4s; }
     .camera-toggle-btn:hover svg { transform: rotate(180deg); }
 
-    /* THẺ THÔNG TIN NỔI BÊN DƯỚI */
+    /* VÙNG CHỨA THẺ KẾT QUẢ ĐỂ CHỐNG GIẬT KHUNG HÌNH */
+    .result-wrapper {
+      min-height: 86px; 
+      display: flex;
+      width: 100%;
+    }
+
+    /* THẺ THÔNG TIN NỔI BÊN DƯỚI (MẶC ĐỊNH ẨN BỎ TRỐNG) */
     .result-widget {
-      background: rgba(15, 23, 42, 0.7); 
-      border: 1px solid var(--glass-border); 
+      width: 100%;
+      background: rgba(6, 78, 59, 0.4);
+      border: 1px solid rgba(52, 211, 153, 0.5); 
       border-radius: 24px; padding: 14px 18px;
       display: flex; align-items: center; gap: 16px; 
-      min-height: 86px; transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-      box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+      box-shadow: 0 0 20px var(--success-glow); 
+      
+      /* Mặc định ẩn hoàn toàn */
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(15px);
+      transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     }
     
-    .result-widget.scanning { 
-      border-color: rgba(56, 189, 248, 0.4); 
-      box-shadow: 0 0 20px var(--accent-glow); 
+    /* Lớp Active để hiện lên khi quét thành công */
+    .result-widget.show {
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(0);
     }
-    .result-widget.scanning .status-icon-bg { 
-      background: linear-gradient(135deg, #0284c7, #38bdf8); 
-    }
-    .result-widget.scanning .widget-subtitle { color: #38bdf8; }
 
-    .result-widget.success { 
-      background: rgba(6, 78, 59, 0.3);
-      border-color: rgba(52, 211, 153, 0.5); 
-      box-shadow: 0 0 20px var(--success-glow); 
-    }
-    .result-widget.success .status-icon-bg { 
+    .result-widget .status-icon-bg { 
       background: linear-gradient(135deg, #059669, #34d399); 
     }
-    .result-widget.success .widget-subtitle { color: #34d399; }
+    .result-widget .widget-subtitle { color: #34d399; }
 
     /* Avatar & Icon */
     .status-icon-bg {
-      width: 56px; height: 56px; flex-shrink: 0; background: #334155; 
+      width: 56px; height: 56px; flex-shrink: 0;
       border-radius: 18px; display: flex; align-items: center; justify-content: center;
       position: relative; overflow: hidden;
       box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-      border: 1px solid rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.2);
     }
     .icon-emoji { font-size: 1.5rem; z-index: 2; position: relative; }
     .user-avatar { 
@@ -124,7 +148,7 @@
 
     /* Text Data */
     .widget-text { display: flex; flex-direction: column; gap: 2px; flex: 1; overflow: hidden; }
-    .widget-subtitle { font-size: 0.75rem; text-transform: uppercase; font-weight: 800; color: var(--text-sub); letter-spacing: 1px; }
+    .widget-subtitle { font-size: 0.75rem; text-transform: uppercase; font-weight: 800; letter-spacing: 1px; }
     .widget-title { font-size: 1.15rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
   </style>
@@ -134,13 +158,18 @@
   <div class="app-card">
     <!-- KHU VỰC CAMERA -->
     <div class="camera-container" id="container">
+      
+      <!-- Thông báo trạng thái giữa Camera -->
+      <div id="status-msg"></div>
+
       <button class="camera-toggle-btn" onclick="switchCamera()">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M20 9V7a2 2 0 0 0-2-2h-3.28a2 2 0 0 1-1.34-.53l-1.06-1.06A2 2 0 0 0 10.9 3H7a2 2 0 0 0-2 2v4"></path>
-          <path d="M4 11v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"></path>
-          <path d="M12 16a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"></path>
-          <polyline points="22 7 20 9 18 7"></polyline>
-          <polyline points="2 13 4 11 6 13"></polyline>
+        <!-- Icon đổi camera (Camera Reverse) -->
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M11 19H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h5"></path>
+          <path d="M13 5h7a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-5"></path>
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="m18 22-3-3 3-3"></path>
+          <path d="m6 2 3 3-3 3"></path>
         </svg>
         <span>Đổi Cam</span>
       </button>
@@ -149,15 +178,17 @@
       <canvas id="overlay"></canvas>
     </div>
 
-    <!-- THẺ KẾT QUẢ HIỆN ĐẠI -->
-    <div id="result-widget" class="result-widget">
-      <div class="status-icon-bg">
-        <div id="icon-emoji" class="icon-emoji">⚙️</div>
-        <img id="user-avatar" class="user-avatar" src="" alt="Avatar" onerror="this.style.display='none'; document.getElementById('icon-emoji').style.display='block';">
-      </div>
-      <div class="widget-text">
-        <span id="widget-subtitle" class="widget-subtitle">Hệ Thống</span>
-        <span id="widget-title" class="widget-title">Đang khởi tạo AI...</span>
+    <!-- KHU VỰC BỎ TRỐNG, CHỈ HIỆN KHI CÓ KẾT QUẢ -->
+    <div class="result-wrapper">
+      <div id="result-widget" class="result-widget">
+        <div class="status-icon-bg">
+          <div id="icon-emoji" class="icon-emoji">✅</div>
+          <img id="user-avatar" class="user-avatar" src="" alt="Avatar" onerror="this.style.display='none'; document.getElementById('icon-emoji').style.display='block';">
+        </div>
+        <div class="widget-text">
+          <span id="widget-subtitle" class="widget-subtitle">Mã ID: ---</span>
+          <span id="widget-title" class="widget-title">---</span>
+        </div>
       </div>
     </div>
   </div>
@@ -179,6 +210,7 @@
     const video = document.getElementById('video');
     const container = document.getElementById('container');
     const overlay = document.getElementById('overlay');
+    const statusMsg = document.getElementById('status-msg');
     
     const resultWidget = document.getElementById('result-widget');
     const iconEmoji = document.getElementById('icon-emoji');
@@ -192,10 +224,16 @@
       return match ? `https://drive.google.com/thumbnail?id=${match[0]}&sz=w200-h200-c` : url;
     }
 
-    function updateWidgetUI(state, icon, title, subtitle, avatarUrl = null) {
+    // Hiển thị thông báo chính giữa camera
+    function showCenterMessage(msg) {
+      statusMsg.innerText = msg;
+      statusMsg.style.display = 'block';
+    }
+
+    // Cập nhật dữ liệu thẻ thông tin
+    function populateWidgetData(title, subtitle, avatarUrl) {
       widgetTitle.innerText = title;
       widgetSubtitle.innerText = subtitle;
-      resultWidget.className = `result-widget ${state}`;
 
       if (avatarUrl) {
         iconEmoji.style.display = 'none';
@@ -203,15 +241,14 @@
         userAvatar.style.display = 'block';
       } else {
         userAvatar.style.display = 'none';
-        iconEmoji.innerText = icon;
         iconEmoji.style.display = 'block';
       }
     }
 
-    // Vẽ khung tương lai (4 góc) thay vì khung vuông thô cứng
+    // Vẽ khung góc bo tròn (Corner Brackets)
     function drawFuturisticBox(ctx, box, color) {
       const { x, y, width, height } = box;
-      const len = 25; // Độ dài của từng góc viền
+      const len = 25; 
       
       ctx.strokeStyle = color;
       ctx.lineWidth = 4;
@@ -233,7 +270,7 @@
 
     async function loadModels() {
       try {
-        updateWidgetUI('', '⏳', 'Đang nạp AI...', 'Hệ Thống');
+        showCenterMessage('⏳ Đang nạp mô hình AI...');
         await Promise.all([
           faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
           faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
@@ -241,7 +278,7 @@
         ]);
         startCamera(currentFacingMode);
       } catch (e) {
-        updateWidgetUI('danger', '❌', 'Lỗi tải mô hình AI', 'Lỗi Mạng');
+        showCenterMessage('❌ Lỗi tải mô hình AI');
       }
     }
 
@@ -255,7 +292,7 @@
         video.srcObject = currentStream;
 
         video.className = facingMode === "user" ? "front-camera" : "back-camera";
-        overlay.className = video.className; // Đồng bộ lật màn hình cho canvas
+        overlay.className = video.className; 
         
         video.onloadedmetadata = () => {
           video.play();
@@ -268,7 +305,7 @@
           else startSmoothRecognition();
         };
       } catch (err) {
-        updateWidgetUI('danger', '📷', 'Vui lòng cấp quyền Camera', 'Thiết Bị');
+        showCenterMessage('📷 Vui lòng cấp quyền Camera');
       }
     }
 
@@ -279,7 +316,7 @@
 
     async function loadDataFromAppsScript() {
       try {
-        updateWidgetUI('scanning', '🔄', 'Đang đồng bộ dữ liệu...', 'Máy Chủ');
+        showCenterMessage('🔄 Đang đồng bộ dữ liệu...');
         const response = await fetch(SCRIPT_URL);
         const result = await response.json();
         
@@ -302,17 +339,18 @@
             faceMatcher = new faceapi.FaceMatcher(labeledFaceDescriptors, 0.38);
             startSmoothRecognition();
           } else {
-            updateWidgetUI('scanning', '⏳', 'Hệ thống sẵn sàng', 'Chờ Dữ Liệu');
+            showCenterMessage('⏳ Hệ thống sẵn sàng (Chờ Dữ Liệu)');
           }
         }
       } catch (error) { 
-        updateWidgetUI('danger', '🔌', 'Mất kết nối máy chủ', 'Hệ Thống'); 
+        showCenterMessage('🔌 Mất kết nối máy chủ');
       }
     }
 
     async function startSmoothRecognition() {
       isRunning = true;
-      updateWidgetUI('scanning', '🎯', 'Đang tìm khuôn mặt...', 'Sẵn Sàng Quét');
+      // Ẩn thông báo khi camera đã sẵn sàng và bắt đầu quét
+      statusMsg.style.display = 'none';
 
       const options = new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.55 });
       const ctx = overlay.getContext('2d');
@@ -325,8 +363,9 @@
 
           if (!detection) {
             missingFrames++;
+            // Ẩn bảng kết quả phía dưới nếu mất khuôn mặt quá 3 khung hình (Trở về trạng thái bỏ trống)
             if (missingFrames > 3 && lastScanLabel !== "scanning") {
-              updateWidgetUI('scanning', '🎯', 'Đang tìm khuôn mặt...', 'Sẵn Sàng Quét');
+              resultWidget.classList.remove('show');
               lastScanLabel = "scanning";
             }
           } else {
@@ -338,7 +377,7 @@
 
             if (isStranger) {
               if (lastScanLabel !== "scanning") {
-                updateWidgetUI('scanning', '🎯', 'Đang tìm khuôn mặt...', 'Sẵn Sàng Quét');
+                resultWidget.classList.remove('show'); // Ẩn thẻ nếu là người lạ
                 lastScanLabel = "scanning";
               }
             } else {
@@ -348,7 +387,10 @@
               if (lastScanLabel !== bestMatch.label) {
                 lastScanLabel = bestMatch.label;
                 const emp = employeeData[bestMatch.label];
-                updateWidgetUI('success', '✅', emp.name, `ID: ${bestMatch.label}`, emp.image);
+                
+                // Hiện thẻ kết quả lên khi đã khớp danh tính
+                populateWidgetData(emp.name, `Mã ID: ${bestMatch.label}`, emp.image);
+                resultWidget.classList.add('show');
               }
             }
           }
@@ -360,7 +402,7 @@
       detectFrame();
     }
 
-    // Tự động dừng/mở camera khi ẩn tab giúp tối ưu hiệu năng
+    // Tự động dừng/mở camera khi ẩn tab
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) {
         isRunning = false;
