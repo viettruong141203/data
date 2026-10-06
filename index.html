@@ -39,7 +39,6 @@
     canvas.front-camera { transform: scaleX(-1); }
     canvas.back-camera { transform: scaleX(1); }
 
-    /* Màn hình tải dữ liệu nằm giữa Camera */
     .loading-overlay {
       position: absolute; top: 0; left: 0; width: 100%; height: 100%;
       background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(6px);
@@ -53,7 +52,6 @@
     }
     @keyframes spin { 100% { transform: rotate(360deg); } }
 
-    /* Nút đổi camera với biểu tượng SVG chuyên nghiệp */
     .icon-btn {
       position: absolute; top: 16px; right: 16px; width: 46px; height: 46px;
       background: rgba(0, 0, 0, 0.3); color: #FFFFFF; border: 1px solid rgba(255, 255, 255, 0.3);
@@ -64,16 +62,18 @@
     .icon-btn:hover { background: rgba(0, 0, 0, 0.5); transform: scale(1.05) rotate(180deg); }
     .icon-btn svg { width: 22px; height: 22px; stroke: currentColor; }
 
-    /* Hộp Thông Tin Phía Dưới */
+    /* Hộp Thông Tin (Luôn chừa khoảng trống) */
     .info-box {
       background: #F8FAFC; border: 2px solid #E2E8F0; border-radius: 20px; padding: 16px;
       display: flex; align-items: center; gap: 16px; min-height: 90px;
-      animation: slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      opacity: 1; visibility: visible;
     }
     
-    @keyframes slideUp {
-      from { opacity: 0; transform: translateY(10px); }
-      to { opacity: 1; transform: translateY(0); }
+    /* Trạng thái Tàng hình: Chừa khoảng trống nhưng không hiển thị nội dung */
+    .info-box.hide {
+      opacity: 0; 
+      visibility: hidden; 
     }
 
     .info-box.scanning { background: #EEF2FF; border-color: #C7D2FE; box-shadow: 0 8px 16px rgba(99, 102, 241, 0.1); }
@@ -125,8 +125,8 @@
       <video id="video" autoplay muted playsinline></video>
     </div>
 
-    <!-- Hộp thông tin phía dưới (Mặc định ẩn hoàn toàn) -->
-    <div id="info-box" class="info-box" style="display: none;">
+    <!-- Hộp thông tin (Mặc định ở trạng thái tàng hình 'hide' để chừa khoảng trống) -->
+    <div id="info-box" class="info-box hide">
       <div id="info-visual" class="info-visual">
         <div id="info-icon" class="info-icon">⏳</div>
         <img id="info-avatar" class="info-avatar" src="" alt="Avatar" style="display: none;" onerror="this.style.display='none'; document.getElementById('info-icon').style.display='flex';">
@@ -167,14 +167,13 @@
       return match ? `https://drive.google.com/thumbnail?id=${match[0]}&sz=w200-h200-c` : url;
     }
 
-    // Nâng cấp: Truyền 'hide' để ẩn hoàn toàn hộp thông tin
+    // Logic UI: Ẩn/Hiện bằng Class để chừa không gian cố định
     function updateStatusUI(state, icon, title, subtitle, avatarUrl = null) {
       if (state === 'hide') {
-        infoBox.style.display = 'none';
+        infoBox.className = 'info-box hide';
         return;
       }
       
-      infoBox.style.display = 'flex';
       infoTitle.innerText = title;
       infoSubtitle.innerText = subtitle;
       infoBox.className = `info-box ${state}`;
@@ -292,7 +291,7 @@
       loadingOverlay.style.display = 'none'; 
       btnSwitch.style.display = 'flex';
       
-      // Ẩn hộp thoại bên dưới đi cho màn hình sạch sẽ
+      // Ở trạng thái bình thường (khi đang quét) -> Làm tàng hình hộp thoại bên dưới
       updateStatusUI('hide');
 
       const options = new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.6 });
@@ -305,7 +304,7 @@
           ctx.clearRect(0, 0, canvas.width, canvas.height);
 
           if (!detection) {
-            // Không thấy mặt -> Bỏ trống bên dưới
+            // Không có mặt -> Chuyển về chế độ Tàng hình
             if (lastScanLabel !== "scanning") {
               updateStatusUI('hide');
               lastScanLabel = "scanning";
@@ -317,20 +316,20 @@
             const isStranger = bestMatch.label === "unknown";
 
             if (isStranger) {
-              // Thấy người lạ -> Vẫn bỏ trống bên dưới, lơ đi
+              // Là người lạ -> Lơ đi, tiếp tục chế độ Tàng hình
               if (lastScanLabel !== "scanning") {
                 updateStatusUI('hide');
                 lastScanLabel = "scanning";
               }
             } else {
-              // Vẽ khung xanh quanh mặt
+              // Khung nhận diện vẽ màu xanh
               const drawBox = new faceapi.draw.DrawBox(box, {
                 boxColor: "#10B981", 
                 lineWidth: 3
               });
               drawBox.draw(canvas);
 
-              // Hiện hộp thông tin vì quét đúng người
+              // Nhận diện ĐÚNG người -> Hộp thông tin Mượt mà hiện lên
               if (lastScanLabel !== bestMatch.label) {
                 lastScanLabel = bestMatch.label;
                 const emp = employeeData[bestMatch.label];
@@ -353,7 +352,7 @@
           const ctx = canvas.getContext('2d');
           ctx.clearRect(0, 0, canvas.width, canvas.height);
         }
-        // Khi tạm dừng, hiện lại hộp thông báo cho người dùng biết
+        // Khi thu nhỏ trình duyệt, hiện hộp thông báo báo tạm dừng
         updateStatusUI('scanning', '⏸️', 'Đã tạm dừng camera', 'Hệ Thống');
       } else {
         if (faceMatcher) {
