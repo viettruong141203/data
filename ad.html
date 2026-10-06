@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Face ID - Đăng Ký</title>
+  <title>Face ID - Register Fast</title>
   <script defer src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
@@ -11,33 +11,44 @@
     body, html { width: 100%; height: 100%; background: radial-gradient(circle at 50% 20%, #1e1b4b 0%, #0f172a 100%); display: flex; justify-content: center; align-items: center; padding: 16px; color: #f8fafc; }
     .app-card { background: rgba(30, 41, 59, 0.65); backdrop-filter: blur(24px); padding: 28px; border-radius: 36px; box-shadow: 0 30px 60px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.15); border: 1px solid rgba(255, 255, 255, 0.08); width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 22px; animation: fadeIn 0.4s ease-out;}
     @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    
     .app-header h2 { font-size: 1.4rem; font-weight: 800; color: #ffffff; text-align: center; }
     .section-card { display: flex; flex-direction: column; gap: 18px; }
+    
     .camera-container { position: relative; width: 100%; aspect-ratio: 1; background: #020617; border-radius: 28px; overflow: hidden; display: flex; align-items: center; justify-content: center; }
     #video { width: 100%; height: 100%; object-fit: cover; filter: contrast(1.05); transition: 0.3s; }
     #video.front-camera { transform: scaleX(-1); }
+    
     .face-guide-circle { position: absolute; width: 210px; height: 210px; border: 2px dashed rgba(99, 102, 241, 0.6); border-radius: 50%; pointer-events: none; z-index: 5; transition: 0.3s; }
     .face-guide-circle.active { border-color: #10B981; border-style: solid; border-width: 3px; box-shadow: 0 0 35px rgba(16, 185, 129, 0.5); transform: scale(1.02); }
+    
     .icon-btn { position: absolute; top: 16px; right: 16px; width: 42px; height: 42px; background: rgba(15, 23, 42, 0.6); color: #FFFFFF; border: none; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 10; transition: 0.3s; }
     .icon-btn:hover { background: rgba(99, 102, 241, 0.8); transform: scale(1.1) rotate(180deg); }
+    
     .progress-container { width: 100%; background: rgba(255, 255, 255, 0.08); height: 6px; border-radius: 4px; overflow: hidden; margin-bottom: -10px;}
     .progress-bar { width: 0%; height: 100%; background: linear-gradient(90deg, #6366F1, #10B981); transition: 0.05s; }
     .status-box { font-size: 0.85rem; font-weight: 600; color: #94a3b8; text-align: center; min-height: 24px; }
+
     .btn { width: 100%; padding: 16px; border: none; border-radius: 20px; font-weight: 700; font-size: 1.05rem; cursor: pointer; transition: all 0.3s ease; display: flex; align-items: center; justify-content: center; gap: 8px; }
     .btn-primary { background: linear-gradient(135deg, #6366F1 0%, #4f46e5 100%); color: white; box-shadow: 0 10px 25px rgba(99, 102, 241, 0.4); }
     .btn-primary:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 15px 30px rgba(99, 102, 241, 0.6); }
     .btn-primary:disabled { background: #475569; box-shadow: none; cursor: not-allowed; color: #cbd5e1; }
+    
     .btn-secondary { background: rgba(255, 255, 255, 0.05); color: #cbd5e1; border: 1px solid rgba(255, 255, 255, 0.1); }
     .btn-secondary:hover { background: rgba(255, 255, 255, 0.1); color: #ffffff; }
     .back-link { text-align: center; display: block; font-size: 0.85rem; font-weight: 600; color: #818cf8; text-decoration: none; }
-    
+
+    /* Màn hình Thông Tin Chi Tiết (Success) */
     #section-success { text-align: center; display: none; }
     .success-avatar { width: 120px; height: 120px; margin: 0 auto 10px; border-radius: 50%; padding: 4px; background: linear-gradient(135deg, #10B981, #34D399); box-shadow: 0 0 30px rgba(16, 185, 129, 0.4); }
     .success-avatar img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; border: 3px solid #1e293b; }
-    .info-group { background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 12px 16px; display: flex; flex-direction: column; gap: 4px; text-align: left; }
+    .info-group { background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 12px 16px; display: flex; flex-direction: column; gap: 4px; text-align: left; margin-bottom: 10px;}
     .info-group label { font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px; }
     .info-group .value { font-size: 1.1rem; color: #ffffff; font-weight: 700; }
     .info-group .value.highlight { color: #34D399; font-size: 1.3rem; letter-spacing: 1px; }
+    
+    /* Nút Sync ngầm */
+    .sync-status { font-size: 0.75rem; color: #94a3b8; margin-top: 5px; font-weight: 600; }
   </style>
 </head>
 <body>
@@ -52,20 +63,30 @@
         <div id="guide-circle" class="face-guide-circle"></div>
         <video id="video" autoplay muted playsinline></video>
       </div>
+
       <div class="progress-container"><div id="progress-bar" class="progress-bar"></div></div>
       <div id="status-box" class="status-box">Đang căn chỉnh camera...</div>
+
       <button id="btn-action" class="btn btn-primary" onclick="startScanningProcess()" disabled>⏳ Đang tải dữ liệu...</button>
       <a href="index.html" class="back-link">Quay về Check-in</a>
     </div>
 
+    <!-- PHẦN 2: BẢNG THÔNG TIN HIỆN NGAY LẬP TỨC 0s -->
     <div id="section-success" class="section-card">
       <div class="success-avatar"><img id="success-img" src="" alt="Avatar"></div>
+      <h3 style="color: #34D399; font-weight: 800; font-size: 1.2rem;">Đăng Ký Thành Công!</h3>
       
-      <!-- Dòng trạng thái này sẽ lấy trực tiếp phản hồi từ Apps Script -->
-      <h3 id="server-response-msg" style="color: #34D399; font-weight: 800; font-size: 1.2rem;">---</h3>
-      
-      <div class="info-group"><label>Mã ID Nhân Sự</label><div id="success-id" class="value highlight">---</div></div>
-      <div class="info-group"><label>Thời Gian Ghi Nhận</label><div id="success-time" class="value">---</div></div>
+      <div class="info-group">
+        <label>Mã ID Nhân Sự</label>
+        <div id="success-id" class="value highlight">---</div>
+      </div>
+      <div class="info-group">
+        <label>Thời Gian Ghi Nhận</label>
+        <div id="success-time" class="value">---</div>
+      </div>
+
+      <div id="sync-status" class="sync-status">🔄 Đang đồng bộ với Máy chủ...</div>
+
       <button class="btn btn-secondary" style="margin-top: 10px;" onclick="window.location.reload()">Đăng ký người tiếp theo</button>
       <a href="index.html" class="back-link">Quay về Check-in</a>
     </div>
@@ -76,6 +97,7 @@
     
     let currentStream = null, currentFacingMode = "user", existingFaceMatcher = null;
     let isDataReady = false, isScanningActive = false, scanTimer = 0, collectedDescriptors = [];
+    let listExistingIDs = []; // Mảng chứa ID để check trùng nhanh
 
     const video = document.getElementById('video'), btnAction = document.getElementById('btn-action');
     const statusBox = document.getElementById('status-box'), progressBar = document.getElementById('progress-bar'), guideCircle = document.getElementById('guide-circle');
@@ -94,11 +116,15 @@
         if (result.status === "success" && result.data.length > 0) {
           const labeledDescriptors = [];
           for (let i = 0; i < result.data.length; i++) {
-            const empId = result.data[i][0], rawFaceData = result.data[i][2];
+            const empId = String(result.data[i][0]);
+            const rawFaceData = result.data[i][2];
             if (!empId || !rawFaceData) continue;
+            
+            listExistingIDs.push(empId); // Lưu lại ID vào mảng
+
             try {
               const parsed = typeof rawFaceData === 'string' ? JSON.parse(rawFaceData) : rawFaceData;
-              if (Array.isArray(parsed)) labeledDescriptors.push(new faceapi.LabeledFaceDescriptors(String(empId), [new Float32Array(parsed)]));
+              if (Array.isArray(parsed)) labeledDescriptors.push(new faceapi.LabeledFaceDescriptors(empId, [new Float32Array(parsed)]));
             } catch(e) {}
           }
           if (labeledDescriptors.length > 0) existingFaceMatcher = new faceapi.FaceMatcher(labeledDescriptors, 0.40);
@@ -162,11 +188,10 @@
       if (scanTimer > 0) { scanTimer = 0; progressBar.style.width = '0%'; guideCircle.classList.remove('active'); statusBox.innerText = msg; statusBox.style.color = "#f87171"; collectedDescriptors = []; }
     }
 
+    // 🚀 LÕI SIÊU TỐC ĐỘ 
     async function executeFinalValidation() {
       video.pause();
-      statusBox.innerText = "✨ Đang tạo thẻ ID..."; statusBox.style.color = "#34d399";
-      btnAction.innerHTML = "🚀 Đang tải lên máy chủ... Vui lòng chờ"; // Đổi lời nhắc để người dùng biết đang chờ Apps Script
-
+      
       const canvas = document.createElement('canvas');
       canvas.width = video.videoWidth; canvas.height = video.videoHeight;
       const ctx = canvas.getContext('2d');
@@ -175,6 +200,7 @@
 
       const avgDescriptor = getAverageDescriptor(collectedDescriptors);
       
+      // Chống trùng lặp FaceData
       if (existingFaceMatcher) {
         const matchResult = existingFaceMatcher.findBestMatch(new Float32Array(avgDescriptor));
         if (matchResult.label !== "unknown") {
@@ -183,32 +209,44 @@
         }
       }
 
-      const imageBase64 = canvas.toDataURL('image/jpeg', 0.85);
+      // Tự sinh ID ngay trên trình duyệt
       const now = new Date();
-      const timeWeb = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')} ${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`;
-
-      const payload = { faceData: JSON.stringify(avgDescriptor), time: timeWeb, imageBase64: imageBase64 };
-
-      try {
-        // ĐOẠN NÀY LÀ HỆ THỐNG ĐỨNG CHỜ MÁY CHỦ APPS SCRIPT PHẢN HỒI LẠI ĐÂY
-        const response = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify(payload) });
-        const res = await response.json(); 
-        
-        if (res.status === "success") {
-          // Lấy chính xác dữ liệu từ Apps Script gửi về
-          let finalId = res.data && res.data.id ? res.data.id : (res.message.match(/\d+/) ? res.message.match(/\d+/)[0] : "---");
-          let finalTime = res.data && res.data.time ? res.data.time : timeWeb;
-          
-          // Lấy tin nhắn thành công phản hồi từ Apps Script 
-          let serverMessage = res.message || "Đăng Ký Thành Công!";
-          
-          showSuccessScreen(finalId, finalTime, imageBase64, serverMessage);
-        } else {
-          alert("Lỗi từ server: " + res.message); window.location.reload(); 
-        }
-      } catch(e) { 
-        alert("Lỗi kết nối. Apps Script chưa phản hồi!"); window.location.reload(); 
+      const yy = String(now.getFullYear()).slice(-2);
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      const dd = String(now.getDate()).padStart(2, '0');
+      const datePrefix = yy + mm + dd; // YYMMDD
+      
+      let isUnique = false;
+      let newId = "";
+      while (!isUnique) {
+        const randomNum = Math.floor(10000 + Math.random() * 90000);
+        newId = datePrefix + randomNum.toString();
+        if (!listExistingIDs.includes(newId)) isUnique = true;
       }
+
+      const imageBase64 = canvas.toDataURL('image/jpeg', 0.85);
+      const timeWeb = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')} ${dd}/${mm}/${now.getFullYear()}`;
+
+      // 1. HIỂN THỊ KẾT QUẢ NGAY LẬP TỨC (0 GIÂY CHỜ)
+      showSuccessScreen(newId, timeWeb, imageBase64);
+
+      // 2. GỬI NGẦM LÊN SERVER
+      const payload = { id: newId, faceData: JSON.stringify(avgDescriptor), time: timeWeb, imageBase64: imageBase64 };
+      
+      fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify(payload) })
+        .then(response => response.json())
+        .then(res => {
+          if(res.status === "success") {
+            const syncUI = document.getElementById('sync-status');
+            syncUI.innerText = "✅ Đồng bộ máy chủ hoàn tất!";
+            syncUI.style.color = "#34D399";
+          }
+        })
+        .catch(e => {
+          const syncUI = document.getElementById('sync-status');
+          syncUI.innerText = "⚠️ Lỗi đồng bộ. Hãy kiểm tra mạng!";
+          syncUI.style.color = "#f87171";
+        });
     }
 
     function getAverageDescriptor(descriptors) {
@@ -221,13 +259,12 @@
       return Array.from(avg);
     }
 
-    // Hiển thị màn hình chi tiết, in luôn dòng tin nhắn phản hồi của Apps Script
-    function showSuccessScreen(id, time, imageSrc, serverMessage) {
+    function showSuccessScreen(id, time, imageSrc) {
       if (currentStream) currentStream.getTracks().forEach(t => t.stop());
+      
       document.getElementById('section-scan').style.display = 'none';
       document.getElementById('section-success').style.display = 'block';
       
-      document.getElementById('server-response-msg').innerText = serverMessage; // Chữ "Đăng ký thành công mã: XYZ" do Apps Script báo về
       document.getElementById('success-id').innerText = id;
       document.getElementById('success-time').innerText = time;
       document.getElementById('success-img').src = imageSrc;
