@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI High-Accuracy Face Scanner</title>
+    <title>AI Professional Face Scanner</title>
     <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.min.js"></script>
     <style>
@@ -173,6 +173,9 @@
         let audioCtx = null;
         let lastDetectedMnv = null;
 
+        // Bộ nhớ đệm (Cache) lưu trữ dữ liệu lấy lần đầu để tối ưu tốc độ
+        let cachedDatabase = null;
+
         function playSuccessSound() {
             try {
                 if (!audioCtx) {
@@ -215,24 +218,33 @@
                     faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
                 ]);
 
-                statusMsg.innerText = 'Đang đồng bộ cơ sở dữ liệu...';
-                const response = await fetch(GET_DATA_URL);
-                const result = await response.json();
+                // KIỂM TRA BỘ NHỚ ĐỆM (CACHE)
+                if (!cachedDatabase) {
+                    statusMsg.innerText = 'Đang lấy dữ liệu lần đầu từ API...';
+                    const response = await fetch(GET_DATA_URL);
+                    const result = await response.json();
 
-                if (result.status === "success" && result.data) {
-                    const labeledDescriptors = result.data.map(person => {
-                        const float32Array = new Float32Array(person.embeddings);
-                        const labelData = JSON.stringify({ mnv: person.mnv, name: person.hoTen, driveUrl: person.driveUrl });
-                        return new faceapi.LabeledFaceDescriptors(labelData, [float32Array]);
-                    });
-
-                    // ĐẶT ĐỘ KHẮT KHE CAO (0.35) để AI nhận diện cực kỳ chính xác, tránh nhầm lẫn
-                    faceMatcher = new faceapi.FaceMatcher(labeledDescriptors, 0.35); 
-                    statusMsg.style.display = 'none';
-                    startWebcam();
+                    if (result.status === "success" && result.data) {
+                        cachedDatabase = result.data; // Lưu lại để dùng cho các lần sau
+                    } else {
+                        throw new Error("Dữ liệu API trống hoặc không hợp lệ!");
+                    }
                 } else {
-                    statusMsg.innerText = 'Dữ liệu API trống!';
+                    statusMsg.innerText = 'Đã tải dữ liệu từ bộ nhớ đệm...';
                 }
+
+                // Chuyển đổi dữ liệu đã nhớ thành LabeledFaceDescriptors
+                const labeledDescriptors = cachedDatabase.map(person => {
+                    const float32Array = new Float32Array(person.embeddings);
+                    const labelData = JSON.stringify({ mnv: person.mnv, name: person.hoTen, driveUrl: person.driveUrl });
+                    return new faceapi.LabeledFaceDescriptors(labelData, [float32Array]);
+                });
+
+                // Ngưỡng khắt khe 0.35 đảm bảo chính xác tuyệt đối
+                faceMatcher = new faceapi.FaceMatcher(labeledDescriptors, 0.35); 
+                statusMsg.style.display = 'none';
+                startWebcam();
+
             } catch (error) {
                 statusMsg.innerText = 'Lỗi: ' + error.message;
             }
@@ -278,16 +290,14 @@
             startWebcam();
         }
 
-        // HÀM QUÉT AI LIÊN TỤC VỚI ĐỘ CHÍNH XÁC TỐI ĐA
+        // HÀM QUÉT AI LIÊN TỤC VỚI HIỆU SUẤT CAO NHẤT
         async function detectFaces() {
             if (!isRunning || document.hidden || !mediaStream || !faceMatcher || video.paused || video.ended) {
                 return;
             }
 
-            // Tăng độ tin cậy nhận diện khuôn mặt (scoreThreshold: 0.70) đảm bảo chỉ quét mặt rõ nét
             const detectorOptions = new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.70 });
             
-            // Trích xuất đầy đủ Landmarks (68 điểm cấu trúc mặt) và Face Descriptors để độ chính xác đạt mức cao nhất
             const detections = await faceapi.detectAllFaces(video, detectorOptions)
                 .withFaceLandmarks()
                 .withFaceDescriptors();
@@ -310,7 +320,6 @@
                             const personData = JSON.parse(match.label);
                             matchedPerson = personData; 
                             
-                            // Vẽ khung nhận diện chuẩn xác
                             const drawBox = new faceapi.draw.DrawBox(box, { 
                                 label: personData.name, 
                                 lineWidth: 2, 
