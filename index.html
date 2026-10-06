@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Face ID - Nhận Diện Cao Cấp</title>
+  <title>Face ID - Quét Camera & Ảnh</title>
   
   <script defer src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -14,28 +14,18 @@
     body, html {
       width: 100%; height: 100%;
       background: linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      padding: 20px;
+      display: flex; justify-content: center; align-items: center; padding: 20px;
     }
 
     .app-card {
-      background: rgba(255, 255, 255, 0.85);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      padding: 24px;
-      border-radius: 32px;
+      background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(20px);
+      padding: 24px; border-radius: 32px;
       box-shadow: 0 24px 48px rgba(0, 0, 0, 0.1), inset 0 0 0 1px rgba(255, 255, 255, 0.5);
-      width: 100%;
-      max-width: 480px; 
-      display: flex;
-      flex-direction: column;
-      gap: 20px;
+      width: 100%; max-width: 480px; display: flex; flex-direction: column; gap: 20px;
     }
 
     .app-header { text-align: center; }
-    .app-header h2 { font-size: 1.25rem; font-weight: 800; color: #1E293B; letter-spacing: -0.5px; }
+    .app-header h2 { font-size: 1.25rem; font-weight: 800; color: #1E293B; }
     .app-header p { font-size: 0.85rem; color: #64748B; margin-top: 4px; font-weight: 500; }
 
     .camera-container {
@@ -44,9 +34,10 @@
       box-shadow: 0 12px 24px rgba(0,0,0,0.15); border: 4px solid #FFFFFF;
     }
 
-    #video { width: 100%; height: 100%; object-fit: cover; display: block; }
+    #video, #upload-preview { width: 100%; height: 100%; object-fit: cover; display: block; }
     #video.front-camera { transform: scaleX(-1); }
     #video.back-camera { transform: scaleX(1); }
+    #upload-preview { display: none; } 
 
     canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
     canvas.front-camera { transform: scaleX(-1); }
@@ -60,20 +51,21 @@
     }
     @keyframes scan { 0% { top: 0%; opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { top: 100%; opacity: 0; } }
 
-    .switch-btn {
-      position: absolute; top: 16px; right: 16px; width: 44px; height: 44px;
+    .icon-btn {
+      position: absolute; top: 16px; width: 44px; height: 44px;
       background: rgba(255, 255, 255, 0.25); color: #FFFFFF; border: 1px solid rgba(255, 255, 255, 0.4);
       border-radius: 50%; display: flex; align-items: center; justify-content: center;
       font-size: 1.2rem; cursor: pointer; backdrop-filter: blur(10px); z-index: 10;
-      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      transition: all 0.3s ease; box-shadow: 0 4px 12px rgba(0,0,0,0.1);
     }
-    .switch-btn:hover { background: rgba(255, 255, 255, 0.4); transform: scale(1.1) rotate(180deg); }
+    .icon-btn:hover { background: rgba(255, 255, 255, 0.4); transform: scale(1.1); }
+    .btn-right { right: 16px; }
+    .btn-left { left: 16px; }
 
     /* Hộp Thông Tin Phía Dưới */
     .info-box {
       background: #F8FAFC; border: 2px solid #E2E8F0; border-radius: 20px; padding: 16px;
-      display: flex; align-items: center; gap: 16px; transition: all 0.3s ease;
-      min-height: 90px;
+      display: flex; align-items: center; gap: 16px; transition: all 0.3s ease; min-height: 90px;
     }
     
     .info-box.scanning { background: #EEF2FF; border-color: #C7D2FE; box-shadow: 0 8px 16px rgba(99, 102, 241, 0.1); }
@@ -81,27 +73,26 @@
     .info-box.scanning .info-subtitle { color: #6366F1; }
 
     .info-box.success { background: #ECFDF5; border-color: #A7F3D0; box-shadow: 0 8px 16px rgba(16, 185, 129, 0.1); }
-    .info-box.success .info-visual { background: #10B981; border: 2px solid #34D399; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3); }
+    .info-box.success .info-visual { background: #10B981; border: 2px solid #34D399; }
     .info-box.success .info-subtitle { color: #10B981; }
 
+    /* Ẩn bớt class danger không dùng tới nữa nhưng vẫn giữ để phòng hờ lỗi mạng */
     .info-box.danger { background: #FFF1F2; border-color: #FECDD3; box-shadow: 0 8px 16px rgba(244, 63, 94, 0.1); }
     .info-box.danger .info-visual { background: #F43F5E; box-shadow: 0 0 15px rgba(244, 63, 94, 0.4); }
     .info-box.danger .info-subtitle { color: #F43F5E; }
 
-    /* Vùng chứa Icon hoặc Ảnh đại diện */
     .info-visual {
       width: 60px; height: 60px; flex-shrink: 0; background: #94A3B8; 
-      border-radius: 16px; overflow: hidden; display: flex; align-items: center; justify-content: center;
-      transition: all 0.3s; position: relative;
+      border-radius: 16px; overflow: hidden; display: flex; align-items: center; justify-content: center; position: relative;
     }
     .info-icon { color: #fff; font-size: 1.6rem; z-index: 2; display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; }
     .info-avatar { width: 100%; height: 100%; object-fit: cover; z-index: 3; position: absolute; top: 0; left: 0; }
 
-    /* Chi tiết Tên và ID */
     .info-content { display: flex; flex-direction: column; gap: 2px; flex: 1; overflow: hidden; }
-    .info-subtitle { font-size: 0.8rem; text-transform: uppercase; color: #64748B; font-weight: 800; letter-spacing: 0.5px; }
+    .info-subtitle { font-size: 0.8rem; text-transform: uppercase; color: #64748B; font-weight: 800; }
     .info-title { font-size: 1.1rem; font-weight: 800; color: #0F172A; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
+    #btn-resume-camera { display: none; width: 100%; padding: 12px; margin-top: 10px; background: #6366F1; color: white; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; }
   </style>
 </head>
 <body>
@@ -109,20 +100,23 @@
   <div class="app-card">
     <div class="app-header">
       <h2>Face ID Scanner</h2>
-      <p>Hệ thống nhận diện thông minh</p>
+      <p>Nhận diện qua Camera hoặc Ảnh</p>
     </div>
 
     <div class="camera-container" id="container">
-      <button class="switch-btn" onclick="switchCamera()" title="Đổi camera">🔄</button>
+      <button class="icon-btn btn-left" onclick="document.getElementById('imageUpload').click()" title="Tải ảnh lên">📁</button>
+      <button class="icon-btn btn-right" onclick="switchCamera()" title="Đổi camera trước/sau">🔄</button>
+      
+      <input type="file" id="imageUpload" accept="image/*" style="display: none;">
+
       <div id="scan-line" class="scan-line"></div>
       <video id="video" autoplay muted playsinline></video>
+      <img id="upload-preview" src="" alt="Ảnh tải lên">
     </div>
 
-    <!-- Hộp thông tin (Profile Card) -->
     <div id="info-box" class="info-box">
       <div id="info-visual" class="info-visual">
         <div id="info-icon" class="info-icon">⏳</div>
-        <!-- Thêm sự kiện onerror để tự động hiện lại icon ✅ nếu ảnh Drive bị lỗi tải mạng -->
         <img id="info-avatar" class="info-avatar" src="" alt="Avatar" style="display: none;" onerror="this.style.display='none'; document.getElementById('info-icon').style.display='flex';">
       </div>
       <div class="info-content">
@@ -130,10 +124,12 @@
         <span id="info-title" class="info-title">Đang khởi tạo AI...</span>
       </div>
     </div>
+
+    <button id="btn-resume-camera" onclick="resumeCamera()">📹 Trở lại Camera</button>
   </div>
 
   <script>
-    // ⚠️ Đảm bảo nhập đúng link Apps Script của bạn
+    // ⚠️ Đảm bảo nhập đúng link Apps Script
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzLFwJo3omYl1N7nyqCD5Lq7GJzGc4dCWrpUYWg7IgGiu6e-Budpn4aGrySBEvvPcCI/exec"; 
     
     let faceMatcher = null; 
@@ -142,13 +138,14 @@
     let currentFacingMode = "user"; 
     let currentStream = null;
     let isRunning = false;
-    
-    const employeeData = {};
+    let employeeData = {};
     let lastScanLabel = ""; 
 
     const video = document.getElementById('video');
+    const uploadPreview = document.getElementById('upload-preview');
     const container = document.getElementById('container');
     const scanLine = document.getElementById('scan-line');
+    const btnResumeCamera = document.getElementById('btn-resume-camera');
     
     const infoBox = document.getElementById('info-box');
     const infoIcon = document.getElementById('info-icon');
@@ -156,24 +153,16 @@
     const infoTitle = document.getElementById('info-title');
     const infoSubtitle = document.getElementById('info-subtitle');
 
-    // 🚀 ĐÃ CẬP NHẬT: Dùng Thumbnail API của Google Drive (Tránh bị Github Pages chặn hiển thị ảnh)
     function getDirectImageUrl(url) {
       if (!url) return '';
-      // Bắt đoạn mã ID dài ~33 ký tự trong link Drive
       const match = url.match(/[-\w]{25,}/);
-      if (match) {
-        // Dùng API thumbnail lấy ảnh kích thước vuông, không bị chặn CORS
-        return `https://drive.google.com/thumbnail?id=${match[0]}&sz=w200-h200-c`;
-      }
-      return url;
+      return match ? `https://drive.google.com/thumbnail?id=${match[0]}&sz=w200-h200-c` : url;
     }
 
     function updateStatusUI(state, icon, title, subtitle, avatarUrl = null) {
       infoTitle.innerText = title;
       infoSubtitle.innerText = subtitle;
-      
-      infoBox.classList.remove('scanning', 'success', 'danger');
-      if (state) infoBox.classList.add(state);
+      infoBox.className = `info-box ${state}`;
 
       if (avatarUrl) {
         infoIcon.style.display = 'none';
@@ -202,8 +191,10 @@
 
     async function startCamera(facingMode) {
       isRunning = false;
-      scanLine.style.display = 'none';
-
+      uploadPreview.style.display = 'none';
+      video.style.display = 'block';
+      btnResumeCamera.style.display = 'none';
+      
       if (currentStream) currentStream.getTracks().forEach(track => track.stop());
 
       try {
@@ -211,17 +202,11 @@
         currentStream = await navigator.mediaDevices.getUserMedia(constraints);
         video.srcObject = currentStream;
 
-        if (facingMode === "user") {
-          video.className = "front-camera";
-          if (canvas) canvas.className = "front-camera";
-        } else {
-          video.className = "back-camera";
-          if (canvas) canvas.className = "back-camera";
-        }
+        video.className = facingMode === "user" ? "front-camera" : "back-camera";
+        if (canvas) canvas.className = video.className;
         
         video.onloadedmetadata = () => {
           video.play();
-          
           if (!canvas) {
             canvas = faceapi.createCanvasFromMedia(video);
             container.append(canvas);
@@ -229,11 +214,8 @@
           displaySize = { width: video.videoWidth, height: video.videoHeight };
           faceapi.matchDimensions(canvas, displaySize);
 
-          if (!faceMatcher) {
-            loadDataFromAppsScript();
-          } else {
-            startSmoothRecognition();
-          }
+          if (!faceMatcher) loadDataFromAppsScript();
+          else startSmoothRecognition();
         };
       } catch (err) {
         updateStatusUI('danger', '📷', 'Vui lòng cấp quyền', 'Lỗi Camera');
@@ -245,49 +227,40 @@
       startCamera(currentFacingMode);
     }
 
+    function resumeCamera() {
+      startCamera(currentFacingMode);
+    }
+
     async function loadDataFromAppsScript() {
       try {
-        updateStatusUI('', '🔄', 'Đang tải dữ liệu...', 'Đồng Bộ');
+        updateStatusUI('scanning', '🔄', 'Đang tải dữ liệu...', 'Đồng Bộ');
         const response = await fetch(SCRIPT_URL);
         const result = await response.json();
         
         if (result.status === "success") {
           const labeledFaceDescriptors = [];
-          
           for (let i = 0; i < result.data.length; i++) {
             const row = result.data[i];
-            
-            const empId = row[0];
-            const empName = row[2]; 
-            const rawFaceData = row[3]; 
-            const empImage = row[4]; 
-            
+            const empId = row[0], empName = row[2], rawFaceData = row[3], empImage = row[4]; 
             if (!empId || !rawFaceData) continue;
             
             employeeData[empId] = { name: empName, image: empImage };
-
             try {
               const parsedArray = typeof rawFaceData === 'string' ? JSON.parse(rawFaceData) : rawFaceData;
               if (Array.isArray(parsedArray) && parsedArray.length > 0) {
-                const descriptor = new Float32Array(parsedArray);
-                labeledFaceDescriptors.push(new faceapi.LabeledFaceDescriptors(String(empId), [descriptor]));
+                labeledFaceDescriptors.push(new faceapi.LabeledFaceDescriptors(String(empId), [new Float32Array(parsedArray)]));
               }
-            } catch (err) {
-              console.error("Lỗi parse dữ liệu:", err);
-            }
+            } catch (err) { console.error("Lỗi parse:", err); }
           }
-
           if (labeledFaceDescriptors.length > 0) {
-            // Ngưỡng bảo mật 0.45
             faceMatcher = new faceapi.FaceMatcher(labeledFaceDescriptors, 0.45);
             startSmoothRecognition();
           } else {
-            updateStatusUI('danger', '⚠️', 'Chưa có nhân sự', 'Cảnh Báo');
+            // KHÔNG CẢNH BÁO "CHƯA CÓ NHÂN SỰ": Chuyển về trạng thái Sẵn sàng trung tính
+            updateStatusUI('scanning', '⏳', 'Hệ thống sẵn sàng', 'Chờ dữ liệu');
           }
         }
-      } catch (error) {
-        updateStatusUI('danger', '🔌', 'Lỗi kết nối máy chủ', 'Hệ Thống');
-      }
+      } catch (error) { updateStatusUI('danger', '🔌', 'Lỗi kết nối máy chủ', 'Hệ Thống'); }
     }
 
     async function startSmoothRecognition() {
@@ -300,7 +273,6 @@
 
       const detectFrame = async () => {
         if (!isRunning || video.paused || video.ended || !faceMatcher) return;
-
         try {
           const detection = await faceapi.detectSingleFace(video, options).withFaceLandmarks().withFaceDescriptor();
           ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -311,41 +283,88 @@
               lastScanLabel = "scanning";
             }
           } else {
-            const resizedDetection = faceapi.resizeResults(detection, displaySize);
-            const bestMatch = faceMatcher.findBestMatch(resizedDetection.descriptor);
-            const box = resizedDetection.detection.box;
-            const isStranger = bestMatch.label === "unknown";
-
-            const drawBox = new faceapi.draw.DrawBox(box, {
-              label: isStranger ? "Khách" : employeeData[bestMatch.label].name,
-              boxColor: isStranger ? "#F43F5E" : "#10B981",
-              lineWidth: 3,
-              drawLabelOptions: {
-                backgroundColor: isStranger ? "#F43F5E" : "#10B981",
-                fontColor: '#FFFFFF', fontSize: 16, padding: 10
-              }
-            });
-            drawBox.draw(canvas);
-
-            if (lastScanLabel !== bestMatch.label) {
-              lastScanLabel = bestMatch.label;
-
-              if (isStranger) {
-                updateStatusUI('danger', '🚫', 'Người lạ', 'Cảnh Báo (Chưa đăng ký)');
-              } else {
-                const emp = employeeData[bestMatch.label];
-                updateStatusUI('success', '✅', emp.name, `Mã ID: ${bestMatch.label}`, emp.image);
-              }
-            }
+            handleDetectionResult(detection, ctx);
           }
-        } catch (err) {
-          console.error("Lỗi AI:", err);
-        }
+        } catch (err) { console.error("Lỗi AI:", err); }
 
         if (isRunning) requestAnimationFrame(detectFrame);
       };
-
       detectFrame();
+    }
+
+    document.getElementById('imageUpload').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      isRunning = false;
+      if (currentStream) currentStream.getTracks().forEach(t => t.stop());
+      
+      updateStatusUI('scanning', '⏳', 'Đang phân tích ảnh...', 'Xử lý');
+      video.style.display = 'none';
+      uploadPreview.style.display = 'block';
+      btnResumeCamera.style.display = 'block'; 
+      scanLine.style.display = 'block';
+
+      try {
+        const img = await faceapi.bufferToImage(file);
+        uploadPreview.src = img.src;
+        canvas.className = ""; uploadPreview.className = "";
+        displaySize = { width: uploadPreview.clientWidth, height: uploadPreview.clientHeight };
+        faceapi.matchDimensions(canvas, displaySize);
+
+        const options = new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 });
+        const detection = await faceapi.detectSingleFace(uploadPreview, options).withFaceLandmarks().withFaceDescriptor();
+        
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        if (!detection) {
+          updateStatusUI('scanning', '❓', 'Không quét được khuôn mặt', 'Kết quả');
+        } else {
+          handleDetectionResult(detection, ctx, true);
+        }
+      } catch (err) {
+        updateStatusUI('danger', '⚠️', 'Lỗi đọc ảnh', 'Hệ Thống');
+      }
+      scanLine.style.display = 'none';
+      e.target.value = '';
+    });
+
+    function handleDetectionResult(detection, ctx, isStaticImage = false) {
+      const resizedDetection = faceapi.resizeResults(detection, displaySize);
+      const bestMatch = faceMatcher.findBestMatch(resizedDetection.descriptor);
+      const box = resizedDetection.detection.box;
+      const isStranger = bestMatch.label === "unknown";
+
+      // KHÔNG CẢNH BÁO NGƯỜI LẠ
+      if (isStranger) {
+        if (isStaticImage) {
+          updateStatusUI('scanning', '❓', 'Dữ liệu không khớp', 'Kết quả');
+        } else if (lastScanLabel !== "scanning") {
+          // Bỏ qua trong im lặng, tiếp tục quét
+          updateStatusUI('scanning', '🎯', 'Đang quét khuôn mặt...', 'Sẵn Sàng');
+          lastScanLabel = "scanning";
+        }
+        return; // Dừng tại đây, không vẽ khung đỏ lên mặt
+      }
+
+      // Xử lý khi nhận đúng nhân viên đã đăng ký
+      const drawBox = new faceapi.draw.DrawBox(box, {
+        label: employeeData[bestMatch.label].name,
+        boxColor: "#10B981",
+        lineWidth: 3,
+        drawLabelOptions: {
+          backgroundColor: "#10B981",
+          fontColor: '#FFFFFF', fontSize: 16, padding: 10
+        }
+      });
+      drawBox.draw(canvas);
+
+      if (isStaticImage || lastScanLabel !== bestMatch.label) {
+        if (!isStaticImage) lastScanLabel = bestMatch.label;
+        const emp = employeeData[bestMatch.label];
+        updateStatusUI('success', '✅', emp.name, `Mã ID: ${bestMatch.label}`, emp.image);
+      }
     }
 
     window.onload = loadModels;
