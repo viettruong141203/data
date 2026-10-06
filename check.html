@@ -172,9 +172,9 @@
         let mediaStream = null;
         let audioCtx = null;
         let lastDetectedMnv = null;
-
-        // Bộ nhớ đệm (Cache) lưu trữ dữ liệu lấy lần đầu để tối ưu tốc độ
         let cachedDatabase = null;
+        let lastFrameTime = 0;
+        const FPS_LIMIT = 100; // Giới hạn giãn cách giữa các khung hình AI để chống quá tải bộ nhớ và treo trình duyệt
 
         function playSuccessSound() {
             try {
@@ -218,14 +218,13 @@
                     faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
                 ]);
 
-                // KIỂM TRA BỘ NHỚ ĐỆM (CACHE)
                 if (!cachedDatabase) {
                     statusMsg.innerText = 'Đang lấy dữ liệu lần đầu từ API...';
                     const response = await fetch(GET_DATA_URL);
                     const result = await response.json();
 
                     if (result.status === "success" && result.data) {
-                        cachedDatabase = result.data; // Lưu lại để dùng cho các lần sau
+                        cachedDatabase = result.data;
                     } else {
                         throw new Error("Dữ liệu API trống hoặc không hợp lệ!");
                     }
@@ -233,15 +232,13 @@
                     statusMsg.innerText = 'Đã tải dữ liệu từ bộ nhớ đệm...';
                 }
 
-                // Chuyển đổi dữ liệu đã nhớ thành LabeledFaceDescriptors
                 const labeledDescriptors = cachedDatabase.map(person => {
                     const float32Array = new Float32Array(person.embeddings);
                     const labelData = JSON.stringify({ mnv: person.mnv, name: person.hoTen, driveUrl: person.driveUrl });
                     return new faceapi.LabeledFaceDescriptors(labelData, [float32Array]);
                 });
 
-                // Ngưỡng khắt khe 0.35 đảm bảo chính xác tuyệt đối
-                faceMatcher = new faceapi.FaceMatcher(labeledDescriptors, 0.35); 
+                faceMatcher = new faceapi.FaceMatcher(labeledDescriptors, 0.38); 
                 statusMsg.style.display = 'none';
                 startWebcam();
 
@@ -290,70 +287,78 @@
             startWebcam();
         }
 
-        // HÀM QUÉT AI LIÊN TỤC VỚI HIỆU SUẤT CAO NHẤT
-        async function detectFaces() {
+        // HÀM QUÉT AI LIÊN TỤC VỚI CƠ CHẾ CHỐNG TREO BỘ NHỚ
+        async function detectFaces(timestamp) {
             if (!isRunning || document.hidden || !mediaStream || !faceMatcher || video.paused || video.ended) {
                 return;
             }
 
-            const detectorOptions = new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.70 });
-            
-            const detections = await faceapi.detectAllFaces(video, detectorOptions)
-                .withFaceLandmarks()
-                .withFaceDescriptors();
+            // Kiểm tra và điều tiết thời gian thực thi khung hình để tránh quá tải CPU/GPU
+            if (timestamp - lastFrameTime >= FPS_LIMIT) {
+                lastFrameTime = timestamp;
 
-            const displaySize = { width: video.clientWidth, height: video.clientHeight };
-            const resizedDetections = faceapi.resizeResults(detections, displaySize);
-            
-            const ctx = overlay.getContext('2d');
-            ctx.clearRect(0, 0, overlay.width, overlay.height);
+                try {
+                    const detectorOptions = new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.65 });
+                    const detections = await faceapi.detectAllFaces(video, detectorOptions)
+                        .withFaceLandmarks()
+                        .withFaceDescriptors();
 
-            let matchedPerson = null;
+                    const displaySize = { width: video.clientWidth, height: video.clientHeight };
+                    const resizedDetections = faceapi.resizeResults(detections, displaySize);
+                    
+                    const ctx = overlay.getContext('2d');
+                    ctx.clearRect(0, 0, overlay.width, overlay.height);
 
-            if (resizedDetections.length > 0) {
-                resizedDetections.forEach(detection => {
-                    const match = faceMatcher.findBestMatch(detection.descriptor);
-                    const box = detection.detection.box;
+                    let matchedPerson = null;
 
-                    if (match.label !== 'unknown') {
-                        try {
-                            const personData = JSON.parse(match.label);
-                            matchedPerson = personData; 
-                            
-                            const drawBox = new faceapi.draw.DrawBox(box, { 
-                                label: personData.name, 
-                                lineWidth: 2, 
-                                boxColor: "#00bfa5",
-                                drawLabelOptions: { fontSize: 14, fontColor: '#fff', backgroundColor: "#00bfa5", padding: 4 }
-                            });
-                            drawBox.draw(overlay);
+                    if (resizedDetections.length > 0) {
+                        resizedDetections.forEach(detection => {
+                            const match = faceMatcher.findBestMatch(detection.descriptor);
+                            const box = detection.detection.box;
 
-                            if (lastDetectedMnv !== personData.mnv) {
-                                playSuccessSound();
-                                lastDetectedMnv = personData.mnv;
+                            if (match.label !== 'unknown') {
+                                try {
+                                    const personData = JSON.parse(match.label);
+                                    matchedPerson = personData; 
+                                    
+                                    const drawBox = new faceapi.draw.DrawBox(box, { 
+                                        label: personData.name, 
+                                        lineWidth: 2, 
+                                        boxColor: "#00bfa5",
+                                        drawLabelOptions: { fontSize: 14, fontColor: '#fff', backgroundColor: "#00bfa5", padding: 4 }
+                                    });
+                                    drawBox.draw(overlay);
+
+                                    if (lastDetectedMnv !== personData.mnv) {
+                                        playSuccessSound();
+                                        lastDetectedMnv = personData.mnv;
+                                    }
+
+                                } catch (e) { console.error(e); }
                             }
-
-                        } catch (e) { console.error(e); }
+                        });
+                    } else {
+                        lastDetectedMnv = null;
                     }
-                });
-            } else {
-                lastDetectedMnv = null;
-            }
 
-            if (matchedPerson) {
-                resultCard.classList.add('active');
-                document.getElementById('res-mnv').innerText = matchedPerson.mnv;
-                document.getElementById('res-name').innerText = matchedPerson.name;
-                
-                if(matchedPerson.driveUrl) {
-                    const newImgSrc = getDirectDriveUrl(matchedPerson.driveUrl);
-                    const currentImgSrc = document.getElementById('res-avatar').src;
-                    if (currentImgSrc !== newImgSrc) {
-                        document.getElementById('res-avatar').src = newImgSrc;
+                    if (matchedPerson) {
+                        resultCard.classList.add('active');
+                        document.getElementById('res-mnv').innerText = matchedPerson.mnv;
+                        document.getElementById('res-name').innerText = matchedPerson.name;
+                        
+                        if(matchedPerson.driveUrl) {
+                            const newImgSrc = getDirectDriveUrl(matchedPerson.driveUrl);
+                            const currentImgSrc = document.getElementById('res-avatar').src;
+                            if (currentImgSrc !== newImgSrc) {
+                                document.getElementById('res-avatar').src = newImgSrc;
+                            }
+                        }
+                    } else {
+                        resultCard.classList.remove('active');
                     }
+                } catch (err) {
+                    console.error("Lỗi trong vòng lặp quét AI:", err);
                 }
-            } else {
-                resultCard.classList.remove('active');
             }
 
             if (isRunning) {
@@ -371,13 +376,16 @@
             }
         });
 
+        // Tự động phục hồi khi chuyển tab hoặc bật lại màn hình điện thoại
         document.addEventListener('visibilitychange', () => {
             if (document.hidden) {
                 isRunning = false;
                 stopWebcam();
             } else {
+                if (!mediaStream) {
+                    startWebcam();
+                }
                 isRunning = true;
-                startWebcam();
                 requestAnimationFrame(detectFaces);
             }
         });
