@@ -162,15 +162,16 @@
         const resultCard = document.getElementById('resultCard');
         const statusMsg = document.getElementById('status-msg');
         
-        const API_URL = 'https://script.google.com/macros/s/AKfycbzwoSShI37Pg6P4GhIYSwpcGkN_LeO0fLldHWBvYyz96PFx_qCAfV7IE3mBxFheZXrDNQ/exec';
+        const GET_DATA_URL = 'https://script.google.com/macros/s/AKfycbzwoSShI37Pg6P4GhIYSwpcGkN_LeO0fLldHWBvYyz96PFx_qCAfV7IE3mBxFheZXrDNQ/exec';
+        const POST_DATA_URL = 'https://script.google.com/macros/s/AKfycbyOz_0L9XUbwzt50UNG7M9ftZKmeYx_NdTFjep5hc25OeTfb1YlhiwvkCPUV4fHGMeMqA/exec';
         const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/';
         
         let faceMatcher = null;
         let isDetecting = false;
         let useFrontCamera = true;
         let scanTimeout = null;
+        let lastSentLog = {}; 
 
-        // Định dạng lại link Google Drive chính xác theo yêu cầu
         function getDirectDriveUrl(url) {
             if (!url) return 'https://i.imgur.com/6VBx3io.png';
             const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
@@ -178,6 +179,41 @@
                 return `https://drive.google.com/uc?export=view&id=${match[1]}`;
             }
             return url;
+        }
+
+        // Lấy thời gian hiện tại chuẩn định dạng
+        function getCurrentFormattedTime() {
+            const d = new Date();
+            const timeStr = `${("0"+d.getHours()).slice(-2)}:${("0"+d.getMinutes()).slice(-2)}:${("0"+d.getSeconds()).slice(-2)}`;
+            const dateStr = `${("0"+d.getDate()).slice(-2)}/${("0"+(d.getMonth()+1)).slice(-2)}/${d.getFullYear()}`;
+            return `${timeStr} ${dateStr}`;
+        }
+
+        // --- HÀM GỬI NGẦM TỐI ƯU ---
+        function sendToGoogleSheet(person) {
+            const now = Date.now();
+            // Nếu người này vừa quét trong 15 giây qua thì bỏ qua để không gửi lặp dữ liệu
+            if (lastSentLog[person.mnv] && (now - lastSentLog[person.mnv]) < 15000) {
+                return; 
+            }
+            lastSentLog[person.mnv] = now;
+
+            const payload = {
+                action: "add",
+                sheet: "Face ID",
+                Cot_C: getCurrentFormattedTime(),
+                Cot_D: person.mnv,
+                Cot_E: person.name
+            };
+
+            // Dùng text/plain để gửi ngầm JSON, tránh 100% lỗi CORS block của trình duyệt
+            fetch(POST_DATA_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify(payload)
+            }).catch(() => {
+                // Bỏ qua lỗi kết nối (chạy ngầm hoàn toàn)
+            });
         }
 
         async function init() {
@@ -192,7 +228,7 @@
                 ]);
 
                 statusMsg.innerText = 'Đang đồng bộ dữ liệu...';
-                const response = await fetch(API_URL);
+                const response = await fetch(GET_DATA_URL);
                 const result = await response.json();
 
                 if (result.status === "success" && result.data) {
@@ -261,13 +297,11 @@
                     const match = faceMatcher.findBestMatch(detection.descriptor);
                     const box = detection.detection.box;
 
-                    // CHỈ VẼ KHUNG NẾU LÀ NGƯỜI QUEN (KHÁC 'unknown')
                     if (match.label !== 'unknown') {
                         try {
                             const personData = JSON.parse(match.label);
                             matchedPerson = personData; 
                             
-                            // Vẽ khung xanh bám theo khuôn mặt
                             const drawBox = new faceapi.draw.DrawBox(box, { 
                                 label: personData.name, 
                                 lineWidth: 2, 
@@ -275,9 +309,12 @@
                                 drawLabelOptions: { fontSize: 14, fontColor: '#fff', backgroundColor: "#00bfa5", padding: 4 }
                             });
                             drawBox.draw(overlay);
+
+                            // ---- KÍCH HOẠT GỬI NGẦM ----
+                            sendToGoogleSheet(personData);
+
                         } catch (e) { console.error(e); }
                     }
-                    // Người lạ ('unknown') sẽ bị bỏ qua, không vẽ khung hay cảnh báo gì cả.
                 });
             }
 
@@ -289,7 +326,6 @@
                 if(matchedPerson.driveUrl) {
                     const newImgSrc = getDirectDriveUrl(matchedPerson.driveUrl);
                     const currentImgSrc = document.getElementById('res-avatar').src;
-                    
                     if (currentImgSrc !== newImgSrc) {
                         document.getElementById('res-avatar').src = newImgSrc;
                     }
