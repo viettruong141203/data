@@ -105,10 +105,10 @@
         <label>Họ và Tên</label>
         <input type="text" id="empName" placeholder="Nhập đầy đủ họ tên..." autocomplete="off">
       </div>
-      <button class="btn btn-primary" onclick="goToScanSection()">Tiếp tục quét khuôn mặt →</button>
+      <button class="btn btn-primary" onclick="goToScanSection()">Bắt đầu quét khuôn mặt →</button>
     </div>
 
-    <!-- PHẦN 2: QUÉT KHUÔN MẶT 1.2S & ĐỐI CHIẾU -->
+    <!-- PHẦN 2: TỰ ĐỘNG QUÉT 1.2S NGAY LẬP TỨC -->
     <div id="section-scan" class="section-card">
       <div class="camera-container" id="container">
         <button class="icon-btn" onclick="switchCamera()" title="Đổi camera">
@@ -124,13 +124,13 @@
         <video id="video" autoplay muted playsinline></video>
       </div>
 
-      <div id="status-box" class="status-box">Giữ cố định mặt trong vòng tròn...</div>
+      <div id="status-box" class="status-box">Đang khởi động camera...</div>
 
       <div class="progress-container">
         <div id="progress-bar" class="progress-bar"></div>
       </div>
 
-      <button class="btn btn-secondary" onclick="backToInfoSection()">← Quay lại</button>
+      <button class="btn btn-secondary" onclick="backToInfoSection()">← Quay lại đổi tên</button>
     </div>
 
     <a href="index.html" class="back-link">Quay về màn hình Check-in</a>
@@ -145,7 +145,7 @@
     let scanTimer = 0; 
     let scanInterval = null;
     let collectedDescriptors = []; 
-    let existingFaceMatcher = null; // Dùng để kiểm tra trùng mặt
+    let existingFaceMatcher = null; 
 
     const video = document.getElementById('video');
     const statusBox = document.getElementById('status-box');
@@ -164,13 +164,12 @@
         await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
         await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
         isAiLoaded = true;
-        loadExistingDatabase(); // Tải sẵn dữ liệu để check trùng
+        loadExistingDatabase(); 
       } catch(e) {
         console.error("Lỗi tải AI");
       }
     }
 
-    // Tải dữ liệu hiện tại từ Apps Script để kiểm tra xem khuôn mặt đã tồn tại chưa
     async function loadExistingDatabase() {
       try {
         const response = await fetch(SCRIPT_URL);
@@ -195,6 +194,7 @@
       } catch(e) {}
     }
 
+    // Nhập tên xong bấm nút -> Chuyển giao diện và tự động bắt đầu quét liền
     function goToScanSection() {
       const name = inputName.value.trim();
       if (!name) {
@@ -235,6 +235,7 @@
         
         video.onloadedmetadata = () => {
           video.play();
+          // 🚀 TỰ ĐỘNG KÍCH HOẠT VÒNG QUÉT NGAY KHI CAMERA MỞ XONG
           beginFaceCountdown(); 
         };
       } catch(err) {
@@ -289,12 +290,11 @@
             if (scanTimer >= targetTimeMs) {
               stopScanProcess();
               
-              // 🔍 KIỂM TRA XEM KHUÔN MẶT NÀY ĐÃ ĐĂNG KÝ TRƯỚC ĐÓ CHƯA
               const tempAvg = getAverageDescriptor(collectedDescriptors);
               if (existingFaceMatcher) {
                 const matchResult = existingFaceMatcher.findBestMatch(new Float32Array(tempAvg));
                 if (matchResult.label !== "unknown") {
-                  alert(`⚠️️ Khuôn mặt này đã được đăng ký bởi nhân sự: "${matchResult.label}"! Không thể đăng ký trùng.`);
+                  alert(`⚠ Khuôn mặt này đã được đăng ký bởi nhân sự: "${matchResult.label}"! Không thể đăng ký trùng.`);
                   backToInfoSection();
                   return;
                 }
