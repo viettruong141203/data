@@ -52,7 +52,7 @@
     }
     @keyframes spin { 100% { transform: rotate(360deg); } }
 
-    /* Nút đổi camera với biểu tượng SVG chuyên nghiệp */
+    /* Nút đổi camera */
     .icon-btn {
       position: absolute; top: 16px; right: 16px; width: 46px; height: 46px;
       background: rgba(0, 0, 0, 0.3); color: #FFFFFF; border: 1px solid rgba(255, 255, 255, 0.3);
@@ -98,14 +98,14 @@
   <div class="app-card">
     <div class="camera-container" id="container">
       
-      <!-- Lớp phủ Đang tải dữ liệu -->
+      <!-- Chỉ hiện màn hình Đang tải dữ liệu ban đầu -->
       <div id="loading-overlay" class="loading-overlay">
         <div class="spinner"></div>
         <span>Đang tải dữ liệu...</span>
       </div>
 
-      <!-- Nút đổi camera -->
-      <button class="icon-btn" onclick="switchCamera()" title="Đổi camera">
+      <!-- Nút đổi camera (Mặc định ẩn) -->
+      <button id="btn-switch" class="icon-btn" onclick="switchCamera()" title="Đổi camera" style="display: none;">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
           <path d="M20 9V7a2 2 0 0 0-2-2h-3.28a2 2 0 0 1-1.34-.53l-1.06-1.06A2 2 0 0 0 10.9 3H7a2 2 0 0 0-2 2v4"></path>
           <path d="M4 11v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"></path>
@@ -118,14 +118,15 @@
       <video id="video" autoplay muted playsinline></video>
     </div>
 
-    <div id="info-box" class="info-box">
+    <!-- Hộp thông tin phía dưới (Mặc định ẩn) -->
+    <div id="info-box" class="info-box" style="display: none;">
       <div id="info-visual" class="info-visual">
         <div id="info-icon" class="info-icon">⏳</div>
         <img id="info-avatar" class="info-avatar" src="" alt="Avatar" style="display: none;" onerror="this.style.display='none'; document.getElementById('info-icon').style.display='flex';">
       </div>
       <div class="info-content">
         <span id="info-subtitle" class="info-subtitle">Hệ Thống</span>
-        <span id="info-title" class="info-title">Đang khởi tạo...</span>
+        <span id="info-title" class="info-title">Đang quét...</span>
       </div>
     </div>
   </div>
@@ -145,6 +146,7 @@
     const video = document.getElementById('video');
     const container = document.getElementById('container');
     const loadingOverlay = document.getElementById('loading-overlay');
+    const btnSwitch = document.getElementById('btn-switch');
     
     const infoBox = document.getElementById('info-box');
     const infoIcon = document.getElementById('info-icon');
@@ -174,7 +176,6 @@
       }
     }
 
-    // Tắt camera hoàn toàn để giải phóng tài nguyên
     function stopCamera() {
       isRunning = false;
       if (currentStream) {
@@ -189,13 +190,14 @@
     async function loadModels() {
       const MODEL_URL = 'https://justadudewhohacks.github.io/face-api.js/models';
       try {
-        updateStatusUI('', '⏳', 'Đang tải AI...', 'Hệ Thống');
         await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
         await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
         await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
         
         startCamera(currentFacingMode);
       } catch (e) {
+        loadingOverlay.style.display = 'none';
+        infoBox.style.display = 'flex';
         updateStatusUI('danger', '❌', 'Không thể tải AI', 'Lỗi Mạng');
       }
     }
@@ -225,8 +227,9 @@
           else startSmoothRecognition();
         };
       } catch (err) {
-        updateStatusUI('danger', '📷', 'Vui lòng cấp quyền', 'Lỗi Camera');
         loadingOverlay.style.display = 'none';
+        infoBox.style.display = 'flex';
+        updateStatusUI('danger', '📷', 'Vui lòng cấp quyền', 'Lỗi Camera');
       }
     }
 
@@ -237,7 +240,6 @@
 
     async function loadDataFromAppsScript() {
       try {
-        updateStatusUI('scanning', '🔄', 'Đang tải dữ liệu...', 'Đồng Bộ');
         const response = await fetch(SCRIPT_URL);
         const result = await response.json();
         
@@ -256,23 +258,33 @@
               }
             } catch (err) {}
           }
+          
           if (labeledFaceDescriptors.length > 0) {
             faceMatcher = new faceapi.FaceMatcher(labeledFaceDescriptors, 0.38);
             startSmoothRecognition();
           } else {
+            // Khi chưa có dữ liệu trên Sheets
             loadingOverlay.style.display = 'none';
+            btnSwitch.style.display = 'flex';
+            infoBox.style.display = 'flex';
             updateStatusUI('scanning', '⏳', 'Hệ thống sẵn sàng', 'Chờ dữ liệu');
           }
         }
       } catch (error) { 
-        loadingOverlay.style.display = 'none'; 
+        loadingOverlay.style.display = 'none';
+        infoBox.style.display = 'flex';
         updateStatusUI('danger', '🔌', 'Lỗi kết nối máy chủ', 'Hệ Thống'); 
       }
     }
 
     async function startSmoothRecognition() {
       isRunning = true;
+      
+      // Ẩn lớp phủ Tải dữ liệu, hiện Nút đổi Camera và Hộp thông tin
       loadingOverlay.style.display = 'none'; 
+      btnSwitch.style.display = 'flex';
+      infoBox.style.display = 'flex';
+      
       updateStatusUI('scanning', '🎯', 'Đang quét khuôn mặt...', 'Sẵn Sàng');
 
       const options = new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.6 });
@@ -323,25 +335,24 @@
       detectFrame();
     }
 
-    // 🚀 LẮNG NGHE SỰ KIỆN: RỜI KHỎI TRANG HOẶC CHUYỂN TAB ĐỂ TẮT CAMERA
+    // Tự động tắt camera khi chuyển tab
     document.addEventListener("visibilitychange", () => {
       if (document.hidden) {
-        // Chuyển qua tab/ứng dụng khác -> Dừng hẳn camera
         stopCamera();
         if(canvas) {
           const ctx = canvas.getContext('2d');
           ctx.clearRect(0, 0, canvas.width, canvas.height);
         }
-        updateStatusUI('scanning', '⏸️', 'Đã tạm dừng camera', 'Hệ Thống');
+        if (infoBox.style.display !== 'none') {
+          updateStatusUI('scanning', '⏸️', 'Đã tạm dừng camera', 'Hệ Thống');
+        }
       } else {
-        // Quay lại trang -> Tự động bật lại camera và quét tiếp
         if (faceMatcher) {
           startCamera(currentFacingMode);
         }
       }
     });
 
-    // Khi đóng hẳn trình duyệt hoặc reload lại trang
     window.addEventListener("beforeunload", () => {
       stopCamera();
     });
