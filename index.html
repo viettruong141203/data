@@ -17,7 +17,6 @@
       display: flex; justify-content: center; align-items: center; padding: 15px;
     }
 
-    /* Đã tối ưu padding lại cho cân đối khi bỏ tiêu đề */
     .app-card {
       background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(20px);
       padding: 16px; border-radius: 32px;
@@ -93,7 +92,7 @@
   <div class="app-card">
     <div class="camera-container" id="container">
       
-      <!-- Nút đổi camera với biểu tượng SVG chuẩn Pro -->
+      <!-- Nút đổi camera -->
       <button class="icon-btn" onclick="switchCamera()" title="Đổi camera">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
           <path d="M20 9V7a2 2 0 0 0-2-2h-3.28a2 2 0 0 1-1.34-.53l-1.06-1.06A2 2 0 0 0 10.9 3H7a2 2 0 0 0-2 2v4"></path>
@@ -244,6 +243,7 @@
       } catch (error) { updateStatusUI('danger', '🔌', 'Lỗi kết nối máy chủ', 'Hệ Thống'); }
     }
 
+    // LUỒNG QUÉT LIÊN TỤC VÀ KHÔNG BỊ DỪNG
     async function startSmoothRecognition() {
       isRunning = true;
       scanLine.style.display = 'block'; 
@@ -270,36 +270,39 @@
             const isStranger = bestMatch.label === "unknown";
 
             if (isStranger) {
+              // Bỏ qua người lạ trong im lặng (KHÔNG báo lỗi, KHÔNG dùng return để ngắt vòng lặp quét)
               if (lastScanLabel !== "scanning") {
                 updateStatusUI('scanning', '🎯', 'Đang quét khuôn mặt...', 'Sẵn Sàng');
                 lastScanLabel = "scanning";
               }
-              return; 
-            }
+            } else {
+              // Khi đúng nhân sự, vẽ khung
+              const drawBox = new faceapi.draw.DrawBox(box, {
+                label: employeeData[bestMatch.label].name,
+                boxColor: "#10B981",
+                lineWidth: 3,
+                drawLabelOptions: {
+                  backgroundColor: "#10B981",
+                  fontColor: '#FFFFFF', fontSize: 16, padding: 10
+                }
+              });
+              drawBox.draw(canvas);
 
-            const drawBox = new faceapi.draw.DrawBox(box, {
-              label: employeeData[bestMatch.label].name,
-              boxColor: "#10B981",
-              lineWidth: 3,
-              drawLabelOptions: {
-                backgroundColor: "#10B981",
-                fontColor: '#FFFFFF', fontSize: 16, padding: 10
+              // Cập nhật thông tin nhân sự bên dưới
+              if (lastScanLabel !== bestMatch.label) {
+                lastScanLabel = bestMatch.label;
+                const emp = employeeData[bestMatch.label];
+                updateStatusUI('success', '✅', emp.name, `Mã ID: ${bestMatch.label}`, emp.image);
               }
-            });
-            drawBox.draw(canvas);
-
-            if (lastScanLabel !== bestMatch.label) {
-              lastScanLabel = bestMatch.label;
-              const emp = employeeData[bestMatch.label];
-              updateStatusUI('success', '✅', emp.name, `Mã ID: ${bestMatch.label}`, emp.image);
             }
           }
         } catch (err) { console.error("Lỗi AI:", err); }
 
+        // Gọi lại hàm detectFrame liên tục để tạo vòng lặp không bao giờ dừng
         if (isRunning) requestAnimationFrame(detectFrame);
       };
       
-      detectFrame();
+      detectFrame(); // Khởi động vòng lặp
     }
 
     window.onload = loadModels;
