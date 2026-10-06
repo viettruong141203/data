@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Face ID - Auto Register</title>
+  <script defer src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', sans-serif; }
+    body, html { width: 100%; height: 100%; background: radial-gradient(circle at 50% 20%, #1e1b4b 0%, #0f172a 100%); display: flex; justify-content: center; align-items: center; padding: 16px; color: #f8fafc; }
+    .app-card { background: rgba(30, 41, 59, 0.65); backdrop-filter: blur(24px); padding: 28px; border-radius: 36px; box-shadow: 0 30px 60px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.15); border: 1px solid rgba(255, 255, 255, 0.08); width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 22px; }
+    .app-header h2 { font-size: 1.4rem; font-weight: 800; color: #ffffff; text-align: center; }
+    .camera-container { position: relative; width: 100%; aspect-ratio: 1; background: #020617; border-radius: 28px; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+    #video { width: 100%; height: 100%; object-fit: cover; filter: contrast(1.05); }
+    #video.front-camera { transform: scaleX(-1); }
+    .face-guide-circle { position: absolute; width: 210px; height: 210px; border: 2px dashed rgba(99, 102, 241, 0.6); border-radius: 50%; pointer-events: none; transition: 0.4s; z-index: 5; }
+    .face-guide-circle.active { border-color: #10B981; border-style: solid; border-width: 3px; box-shadow: 0 0 35px rgba(16, 185, 129, 0.5); transform: scale(1.02); }
+    .icon-btn { position: absolute; top: 16px; right: 16px; width: 42px; height: 42px; background: rgba(15, 23, 42, 0.6); color: #FFFFFF; border: none; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 10; transition: 0.3s; }
+    .progress-container { width: 100%; background: rgba(255, 255, 255, 0.08); height: 6px; border-radius: 4px; overflow: hidden; }
+    .progress-bar { width: 0%; height: 100%; background: linear-gradient(90deg, #6366F1, #10B981); transition: 0.05s; }
+    .status-box { font-size: 0.85rem; font-weight: 600; color: #94a3b8; text-align: center; min-height: 24px; }
+    .back-link { text-align: center; display: block; font-size: 0.85rem; font-weight: 600; color: #818cf8; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="app-card">
+    <div class="app-header"><h2>Đăng Ký Khuôn Mặt</h2></div>
+    
+    <div class="camera-container" id="container">
+      <button class="icon-btn" onclick="switchCamera()">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px"><path d="M20 9V7a2 2 0 0 0-2-2h-3.28a2 2 0 0 1-1.34-.53l-1.06-1.06A2 2 0 0 0 10.9 3H7a2 2 0 0 0-2 2v4"></path><path d="M4 11v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"></path><path d="M12 16a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"></path><polyline points="22 7 20 9 18 7"></polyline><polyline points="2 13 4 11 6 13"></polyline></svg>
+      </button>
+      <div id="guide-circle" class="face-guide-circle"></div>
+      <video id="video" autoplay muted playsinline></video>
+    </div>
+
+    <div id="status-box" class="status-box">Đang khởi động AI...</div>
+    <div class="progress-container"><div id="progress-bar" class="progress-bar"></div></div>
+    <a href="index.html" class="back-link">Quay về Check-in</a>
+  </div>
+
+  <script>
+    // Đã cập nhật Link Apps Script mới của bạn
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx3nnZ45NKjve47jyhHHYYUTYxYExbxcoBGbn5SzfBHKBQtvtQ8HQSoyLopq7S4fJb9/exec"; 
+    
+    let currentStream = null, currentFacingMode = "user";
+    let scanTimer = 0, isScanningActive = false, collectedDescriptors = [];
+    let existingFaceMatcher = null;
+
+    const video = document.getElementById('video');
+    const statusBox = document.getElementById('status-box');
+    const progressBar = document.getElementById('progress-bar');
+    const guideCircle = document.getElementById('guide-circle');
+
+    window.onload = async () => {
+      await faceapi.nets.tinyFaceDetector.loadFromUri('https://justadudewhohacks.github.io/face-api.js/models');
+      await faceapi.nets.faceLandmark68Net.loadFromUri('https://justadudewhohacks.github.io/face-api.js/models');
+      await faceapi.nets.faceRecognitionNet.loadFromUri('https://justadudewhohacks.github.io/face-api.js/models');
+      
+      loadExistingDatabase(); 
+      startCamera(currentFacingMode);
+    };
+
+    async function loadExistingDatabase() {
+      try {
+        const response = await fetch(SCRIPT_URL);
+        const result = await response.json();
+        if (result.status === "success" && result.data.length > 0) {
+          const labeledDescriptors = [];
+          for (let i = 0; i < result.data.length; i++) {
+            const empId = result.data[i][0], rawFaceData = result.data[i][2];
+            if (!empId || !rawFaceData) continue;
+            try {
+              const parsed = typeof rawFaceData === 'string' ? JSON.parse(rawFaceData) : rawFaceData;
+              if (Array.isArray(parsed)) {
+                labeledDescriptors.push(new faceapi.LabeledFaceDescriptors(String(empId), [new Float32Array(parsed)]));
+              }
+            } catch(e) {}
+          }
+          if (labeledDescriptors.length > 0) existingFaceMatcher = new faceapi.FaceMatcher(labeledDescriptors, 0.40);
+        }
+      } catch(e) {}
+    }
+
+    async function startCamera(facingMode) {
+      if (currentStream) currentStream.getTracks().forEach(t => t.stop());
+      try {
+        currentStream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 720 }, height: { ideal: 720 }, facingMode: facingMode } });
+        video.srcObject = currentStream;
+        video.className = facingMode === "user" ? "front-camera" : "back-camera";
+        video.onloadedmetadata = () => { video.play(); isScanningActive = true; scanTimer = 0; collectedDescriptors = []; runInstantDetectionLoop(); };
+      } catch(err) { alert("Lỗi Camera!"); }
+    }
+
+    function switchCamera() {
+      isScanningActive = false;
+      currentFacingMode = (currentFacingMode === "user") ? "environment" : "user";
+      startCamera(currentFacingMode);
+    }
+
+    async function runInstantDetectionLoop() {
+      const options = new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.5 });
+      let lastTime = Date.now();
+      statusBox.innerText = "Giữ cố định mặt trong khung tròn...";
+
+      const detectFrame = async () => {
+        if (!isScanningActive || video.paused || video.ended) return;
+        const now = Date.now();
+        if (now - lastTime >= 25) {
+          lastTime = now;
+          try {
+            const detection = await faceapi.detectSingleFace(video, options).withFaceLandmarks().withFaceDescriptor();
+            if (detection) {
+              const box = detection.detection.box;
+              const videoCenter = { x: video.videoWidth / 2, y: video.videoHeight / 2 };
+              const faceCenter = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+              
+              if (Math.abs(faceCenter.x - videoCenter.x) < 180 && Math.abs(faceCenter.y - videoCenter.y) < 180) {
+                scanTimer += 25;
+                collectedDescriptors.push(detection.descriptor);
+                progressBar.style.width = `${Math.min(100, (scanTimer / 200) * 100)}%`;
+                guideCircle.classList.add('active');
+                
+                if (scanTimer >= 200) {
+                  isScanningActive = false;
+                  executeFinalValidation();
+                  return; 
+                }
+              } else { resetCountdown("⚠️ Đưa mặt vào giữa vòng tròn"); }
+            } else { resetCountdown("🔍 Đang tìm kiếm khuôn mặt..."); }
+          } catch (err) {}
+        }
+        if (isScanningActive) requestAnimationFrame(detectFrame);
+      };
+      requestAnimationFrame(detectFrame);
+    }
+
+    function resetCountdown(msg) {
+      if (scanTimer > 0) { scanTimer = 0; progressBar.style.width = '0%'; guideCircle.classList.remove('active'); statusBox.innerText = msg; collectedDescriptors = []; }
+    }
+
+    async function executeFinalValidation() {
+      video.pause();
+      statusBox.innerText = "🔍 Đang kiểm định...";
+      
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d');
+      if (currentFacingMode === "user") { ctx.translate(canvas.width, 0); ctx.scale(-1, 1); }
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      const highResOptions = new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.5 });
+      const finalDetection = await faceapi.detectSingleFace(canvas, highResOptions).withFaceLandmarks().withFaceDescriptor();
+
+      if (!finalDetection) {
+        statusBox.innerText = "⚠️ Ảnh bị mờ. Tự động quét lại...";
+        setTimeout(() => { resetCountdown("Khởi động lại..."); video.play(); isScanningActive = true; runInstantDetectionLoop(); }, 1500);
+        return;
+      }
+
+      const avgDescriptor = getAverageDescriptor(collectedDescriptors);
+      
+      if (existingFaceMatcher) {
+        const matchResult = existingFaceMatcher.findBestMatch(new Float32Array(avgDescriptor));
+        if (matchResult.label !== "unknown") {
+          alert(`⚠ Khuôn mặt này đã đăng ký với mã ID: "${matchResult.label}"!`);
+          window.location.reload(); return;
+        }
+      }
+
+      statusBox.innerText = "✨ Đang tải lên máy chủ...";
+      const imageBase64 = canvas.toDataURL('image/jpeg', 0.85);
+
+      const now = new Date();
+      const timeWeb = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')} ${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`;
+
+      const payload = { faceData: JSON.stringify(avgDescriptor), time: timeWeb, imageBase64: imageBase64 };
+
+      try {
+        const response = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify(payload) });
+        const res = await response.json();
+        alert("🎉 " + res.message); 
+        window.location.reload(); 
+      } catch(e) { alert("Lỗi mạng!"); window.location.reload(); }
+    }
+
+    function getAverageDescriptor(descriptors) {
+      if (descriptors.length === 0) return [];
+      const len = descriptors[0].length;
+      const avg = new Float32Array(len);
+      for (let i = 0; i < len; i++) {
+        let sum = 0;
+        for (let j = 0; j < descriptors.length; j++) sum += descriptors[j][i];
+        avg[i] = sum / descriptors.length;
+      }
+      return Array.from(avg);
+    }
+  </script>
+</body>
+</html>
