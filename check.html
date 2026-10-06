@@ -133,7 +133,6 @@
 
     <div class="main-card">
         <div class="scanner-container">
-            <!-- Dòng đồng bộ dữ liệu hiện giữa màn hình camera -->
             <div id="status-msg">Đang khởi tạo hệ thống...</div>
 
             <video id="video" autoplay muted playsinline></video>
@@ -173,11 +172,9 @@
         let isDetecting = false;
         let useFrontCamera = true;
         let scanTimeout = null;
-        let lastSentLog = {}; 
         let mediaStream = null;
         let audioCtx = null;
 
-        // Hàm phát âm thanh báo hiệu (Beep) khi nhận diện thành công
         function playSuccessSound() {
             try {
                 if (!audioCtx) {
@@ -186,12 +183,12 @@
                 const osc = audioCtx.createOscillator();
                 const gain = audioCtx.createGain();
                 osc.type = 'sine';
-                osc.frequency.setValueAtTime(800, audioCtx.currentTime); // Tần số âm thanh
+                osc.frequency.setValueAtTime(800, audioCtx.currentTime);
                 gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
                 osc.connect(gain);
                 gain.connect(audioCtx.destination);
                 osc.start();
-                osc.stop(audioCtx.currentTime + 0.15); // Kéo dài 150ms
+                osc.stop(audioCtx.currentTime + 0.15);
             } catch (e) {
                 console.error("Không thể phát âm thanh", e);
             }
@@ -213,13 +210,8 @@
             return `${timeStr} ${dateStr}`;
         }
 
+        // Đã bỏ thời gian chờ (cooldown), hệ thống quét liên tục và gửi ngay lập tức
         function sendToGoogleSheet(person) {
-            const now = Date.now();
-            if (lastSentLog[person.mnv] && (now - lastSentLog[person.mnv]) < 15000) {
-                return; 
-            }
-            lastSentLog[person.mnv] = now;
-
             const payload = {
                 action: "add",
                 sheet: "Face ID",
@@ -258,7 +250,7 @@
                     });
 
                     faceMatcher = new faceapi.FaceMatcher(labeledDescriptors, 0.38); 
-                    statusMsg.style.display = 'none'; // Ẩn thông báo khi hoàn tất tải dữ liệu
+                    statusMsg.style.display = 'none';
                     startWebcam();
                 } else {
                     statusMsg.innerText = 'Dữ liệu API trống!';
@@ -345,12 +337,7 @@
                             });
                             drawBox.draw(overlay);
 
-                            // Kiểm tra nếu người này chuẩn bị được gửi dữ liệu (vượt qua bộ lọc thời gian 15s) thì phát âm thanh
-                            const now = Date.now();
-                            if (!lastSentLog[personData.mnv] || (now - lastSentLog[personData.mnv]) >= 15000) {
-                                playSuccessSound(); // Phát âm thanh báo hiệu nhận diện thành công
-                            }
-
+                            playSuccessSound();
                             sendToGoogleSheet(personData);
 
                         } catch (e) { console.error(e); }
