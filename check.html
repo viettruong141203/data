@@ -181,7 +181,6 @@
             return url;
         }
 
-        // Lấy thời gian hiện tại chuẩn định dạng
         function getCurrentFormattedTime() {
             const d = new Date();
             const timeStr = `${("0"+d.getHours()).slice(-2)}:${("0"+d.getMinutes()).slice(-2)}:${("0"+d.getSeconds()).slice(-2)}`;
@@ -189,10 +188,8 @@
             return `${timeStr} ${dateStr}`;
         }
 
-        // --- HÀM GỬI NGẦM TỐI ƯU ---
         function sendToGoogleSheet(person) {
             const now = Date.now();
-            // Nếu người này vừa quét trong 15 giây qua thì bỏ qua để không gửi lặp dữ liệu
             if (lastSentLog[person.mnv] && (now - lastSentLog[person.mnv]) < 15000) {
                 return; 
             }
@@ -206,14 +203,11 @@
                 Cot_E: person.name
             };
 
-            // Dùng text/plain để gửi ngầm JSON, tránh 100% lỗi CORS block của trình duyệt
             fetch(POST_DATA_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'text/plain;charset=utf-8' },
                 body: JSON.stringify(payload)
-            }).catch(() => {
-                // Bỏ qua lỗi kết nối (chạy ngầm hoàn toàn)
-            });
+            }).catch(() => {});
         }
 
         async function init() {
@@ -238,7 +232,10 @@
                         return new faceapi.LabeledFaceDescriptors(labelData, [float32Array]);
                     });
 
-                    faceMatcher = new faceapi.FaceMatcher(labeledDescriptors, 0.45);
+                    // BƯỚC 1: HẠ NGƯỠNG SAI SỐ (Khoảng cách Euclidean) XUỐNG 0.38
+                    // Hệ thống sẽ khắt khe hơn khi đối chiếu khuôn mặt, giảm triệt để tỷ lệ nhận diện nhầm
+                    faceMatcher = new faceapi.FaceMatcher(labeledDescriptors, 0.38); 
+                    
                     statusMsg.style.display = 'none';
                     startWebcam();
                 } else {
@@ -280,7 +277,11 @@
                 isDetecting = false; return;
             }
 
-            const detections = await faceapi.detectAllFaces(video, new faceapi.TinyFaceDetectorOptions())
+            // BƯỚC 2: TĂNG NGƯỠNG ĐỘ TIN CẬY KHUÔN MẶT (Score Threshold) LÊN 0.65
+            // Máy sẽ chỉ quét những khuôn mặt đủ sáng, rõ ràng và nhìn trực diện
+            const detectorOptions = new faceapi.TinyFaceDetectorOptions({ scoreThreshold: 0.65 });
+            
+            const detections = await faceapi.detectAllFaces(video, detectorOptions)
                 .withFaceLandmarks()
                 .withFaceDescriptors();
 
@@ -310,7 +311,6 @@
                             });
                             drawBox.draw(overlay);
 
-                            // ---- KÍCH HOẠT GỬI NGẦM ----
                             sendToGoogleSheet(personData);
 
                         } catch (e) { console.error(e); }
