@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Face Scanner - GitHub Interface</title>
-    <!-- Tải thư viện face-api trực tiếp, không dùng defer để tránh lỗi is not defined -->
     <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.min.js"></script>
     <style>
         /* GitHub Dark Theme Variables */
@@ -36,7 +35,6 @@
             display: flex; flex-direction: column; gap: 20px;
         }
 
-        /* Header Style */
         .header {
             border-bottom: 1px solid var(--gh-border);
             padding-bottom: 16px;
@@ -46,7 +44,6 @@
         }
         .header h1 span { color: var(--gh-text); font-weight: 400; }
 
-        /* Main Content Grid */
         .content-grid {
             display: grid;
             grid-template-columns: 1fr;
@@ -57,7 +54,6 @@
             .content-grid { grid-template-columns: 2fr 1fr; }
         }
 
-        /* Camera Box */
         .box {
             background: var(--gh-surface);
             border: 1px solid var(--gh-border);
@@ -71,28 +67,33 @@
             font-size: 14px; font-weight: 600; color: var(--gh-text);
         }
         
-        /* Responsive Video Container */
         .video-wrapper {
             position: relative;
             width: 100%;
             background: #000;
+            overflow: hidden;
         }
+        
+        /* QUAN TRỌNG: Lật camera như gương (Mirror) để thao tác tự nhiên hơn */
+        video, canvas {
+            transform: scaleX(-1);
+            -webkit-transform: scaleX(-1);
+        }
+
         video {
             width: 100%; height: auto;
             max-height: 70vh;
             display: block; object-fit: cover;
         }
+        
         canvas {
             position: absolute;
             top: 0; left: 0;
-            width: 100%; height: 100%; /* Căn canvas phủ kín video */
+            width: 100%; height: 100%;
             object-fit: cover;
         }
 
-        /* Status & Results */
-        .info-panel {
-            display: flex; flex-direction: column; gap: 16px;
-        }
+        .info-panel { display: flex; flex-direction: column; gap: 16px; }
         
         .status-badge {
             display: inline-block; padding: 5px 12px;
@@ -104,11 +105,9 @@
         .status-error { border-color: var(--gh-danger); color: #ff7b72; }
 
         .result-card {
-            padding: 16px;
-            border: 1px solid var(--gh-border);
-            border-radius: 6px;
-            background-color: var(--gh-surface);
-            display: none; /* Ẩn đi cho đến khi nhận diện được */
+            padding: 16px; border: 1px solid var(--gh-border);
+            border-radius: 6px; background-color: var(--gh-surface);
+            display: none;
         }
         .result-card h3 { margin: 0 0 12px 0; font-size: 14px; color: var(--gh-muted); }
         .result-row {
@@ -124,13 +123,11 @@
 <body>
 
     <div class="layout-container">
-        <!-- Header -->
         <div class="header">
             <h1>dinhtruong <span>/</span> face-scanner</h1>
         </div>
 
         <div class="content-grid">
-            <!-- Khu vực Camera -->
             <div class="box">
                 <div class="box-header">Live Camera Feed</div>
                 <div class="video-wrapper">
@@ -139,7 +136,6 @@
                 </div>
             </div>
 
-            <!-- Khu vực Thông tin -->
             <div class="info-panel">
                 <div class="box">
                     <div class="box-header">System Status</div>
@@ -148,7 +144,6 @@
                     </div>
                 </div>
 
-                <!-- Kết quả hiển thị -->
                 <div id="resultCard" class="result-card">
                     <h3>Nhân sự định danh</h3>
                     <div class="result-row">
@@ -174,12 +169,11 @@
         const statusEl = document.getElementById('status');
         const resultCard = document.getElementById('resultCard');
         
-        // Link API của bạn
         const API_URL = 'https://script.google.com/macros/s/AKfycbzwoSShI37Pg6P4GhIYSwpcGkN_LeO0fLldHWBvYyz96PFx_qCAfV7IE3mBxFheZXrDNQ/exec';
         const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/';
         
         let faceMatcher = null;
-        let scanInterval = null;
+        let isDetecting = false; // Cờ kiểm soát vòng lặp, chống giật
 
         function updateStatus(message, type = 'status-loading') {
             statusEl.className = `status-badge ${type}`;
@@ -188,19 +182,20 @@
 
         async function init() {
             try {
-                // Kiểm tra thư viện đã tải thành công chưa
                 if (typeof faceapi === 'undefined') {
                     throw new Error("Thư viện nhận diện chưa được tải.");
                 }
 
-                updateStatus('Đang tải mô hình AI...', 'status-loading');
+                updateStatus('Đang tải AI siêu nhẹ (Fast Model)...', 'status-loading');
+                
+                // TỐI ƯU 1: Đổi sang tinyFaceDetector (nhẹ hơn, mượt hơn gấp nhiều lần)
                 await Promise.all([
-                    faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL),
+                    faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
                     faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
                     faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
                 ]);
 
-                updateStatus('Đang fetch API dữ liệu...', 'status-loading');
+                updateStatus('Đang tải dữ liệu API...', 'status-loading');
                 const response = await fetch(API_URL);
                 const result = await response.json();
 
@@ -211,7 +206,7 @@
                         return new faceapi.LabeledFaceDescriptors(labelData, [float32Array]);
                     });
 
-                    // 0.45 là ngưỡng sai số. Nếu nhận diện nhầm người, hãy giảm xuống 0.40
+                    // Ngưỡng 0.45.
                     faceMatcher = new faceapi.FaceMatcher(labeledDescriptors, 0.45);
                     
                     updateStatus(`Sẵn sàng (${result.total} nhân sự)`, 'status-success');
@@ -226,53 +221,55 @@
         }
 
         function startWebcam() {
-            navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } })
-                .then(stream => {
-                    video.srcObject = stream;
-                })
-                .catch(err => {
-                    updateStatus('Bị từ chối quyền Camera', 'status-error');
-                });
+            navigator.mediaDevices.getUserMedia({ 
+                video: { 
+                    facingMode: 'user', 
+                    width: { ideal: 640 }, // Cố định độ phân giải vừa đủ để tránh giật
+                    height: { ideal: 480 } 
+                } 
+            })
+            .then(stream => {
+                video.srcObject = stream;
+            })
+            .catch(err => {
+                updateStatus('Bị từ chối quyền Camera', 'status-error');
+            });
         }
 
-        video.addEventListener('play', () => {
-            // Lấy độ phân giải gốc của camera
-            const displaySize = { width: video.videoWidth, height: video.videoHeight };
-            faceapi.matchDimensions(overlay, displaySize);
+        // TỐI ƯU 2: Thay setInterval bằng hàm đệ quy bất đồng bộ (chống kẹt frame)
+        async function detectFaces() {
+            if (!faceMatcher || video.paused || video.ended) {
+                isDetecting = false;
+                return;
+            }
 
-            if (scanInterval) clearInterval(scanInterval);
-
-            scanInterval = setInterval(async () => {
-                if (!faceMatcher || video.paused || video.ended) return;
-
-                const detections = await faceapi.detectAllFaces(video)
-                    .withFaceLandmarks()
-                    .withFaceDescriptors();
-                    
-                const resizedDetections = faceapi.resizeResults(detections, displaySize);
+            // Gọi model Tiny thay vì chuẩn để tăng tốc FPS
+            const detections = await faceapi.detectAllFaces(video, new faceapi.TinyFaceDetectorOptions())
+                .withFaceLandmarks()
+                .withFaceDescriptors();
                 
-                const ctx = overlay.getContext('2d');
-                ctx.clearRect(0, 0, overlay.width, overlay.height);
+            const displaySize = { width: video.videoWidth, height: video.videoHeight };
+            const resizedDetections = faceapi.resizeResults(detections, displaySize);
+            
+            const ctx = overlay.getContext('2d');
+            ctx.clearRect(0, 0, overlay.width, overlay.height);
 
-                if (resizedDetections.length === 0) {
-                    resultCard.style.display = 'none';
-                    return;
-                }
-
+            if (resizedDetections.length === 0) {
+                resultCard.style.display = 'none';
+            } else {
                 resizedDetections.forEach(detection => {
                     const match = faceMatcher.findBestMatch(detection.descriptor);
                     const box = detection.detection.box;
 
                     let drawLabel = "Unknown";
-                    let boxColor = "#da3633"; // Màu đỏ GitHub
+                    let boxColor = "#da3633";
 
                     if (match.label !== 'unknown') {
-                        boxColor = "#3fb950"; // Màu xanh GitHub
+                        boxColor = "#3fb950";
                         try {
                             const personData = JSON.parse(match.label);
                             drawLabel = personData.name;
                             
-                            // Cập nhật thông tin vào Panel
                             resultCard.style.display = 'block';
                             document.getElementById('res-mnv').innerText = personData.mnv;
                             document.getElementById('res-name').innerText = personData.name;
@@ -285,7 +282,6 @@
                         resultCard.style.display = 'none';
                     }
 
-                    // Vẽ khung định vị
                     const drawBox = new faceapi.draw.DrawBox(box, { 
                         label: drawLabel, 
                         lineWidth: 2, 
@@ -299,10 +295,24 @@
                     });
                     drawBox.draw(overlay);
                 });
-            }, 150); // Quét mỗi 150ms
+            }
+
+            // Nghỉ 50ms rồi quét tiếp khung hình tiếp theo (giúp máy ko bị nóng/lag)
+            setTimeout(() => {
+                requestAnimationFrame(detectFaces);
+            }, 50);
+        }
+
+        video.addEventListener('play', () => {
+            const displaySize = { width: video.videoWidth, height: video.videoHeight };
+            faceapi.matchDimensions(overlay, displaySize);
+            
+            if (!isDetecting) {
+                isDetecting = true;
+                detectFaces(); // Khởi động vòng lặp an toàn
+            }
         });
 
-        // BẮT BUỘC: Đợi toàn bộ trang web (bao gồm thư viện) tải xong mới chạy hàm init()
         window.addEventListener('load', () => {
             init();
         });
