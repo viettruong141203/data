@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hệ Thống Điểm Danh Bằng Khuôn Mặt</title>
+    <!-- Tải thư viện face-api.js bản tối ưu hóa -->
+    <script defer src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.min.js"></script>
+    <style>
+        :root {
+            --primary: #4caf50;
+            --bg: #121212;
+            --surface: #1e1e1e;
+            --text: #ffffff;
+        }
+        body {
+            margin: 0; padding: 0;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: flex-start;
+            min-height: 100vh;
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        h2 { margin-top: 20px; color: var(--primary); }
+        .container {
+            display: flex; flex-direction: row; gap: 20px;
+            margin-top: 20px; flex-wrap: wrap; justify-content: center;
+        }
+        .video-section {
+            position: relative;
+            background: #000;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+            border: 2px solid #333;
+        }
+        video { display: block; object-fit: cover; }
+        canvas { position: absolute; top: 0; left: 0; }
+        .info-section {
+            background-color: var(--surface);
+            padding: 20px; border-radius: 12px;
+            width: 320px; box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+        }
+        .status-box {
+            padding: 10px; border-radius: 6px;
+            margin-bottom: 15px; font-weight: bold;
+            text-align: center; background-color: #333;
+        }
+        .status-box.loading { color: #ffeb3b; }
+        .status-box.success { background-color: rgba(76, 175, 80, 0.2); color: var(--primary); }
+        .status-box.error { background-color: rgba(244, 67, 54, 0.2); color: #f44336; }
+        
+        .result-card {
+            background: #2a2a2a; padding: 15px; border-radius: 8px;
+            margin-top: 15px; display: none;
+        }
+        .result-card h3 { margin: 0 0 10px 0; font-size: 1.1rem; color: #4fc3f7; }
+        .result-card p { margin: 5px 0; font-size: 0.9rem; }
+    </style>
+</head>
+<body>
+
+    <h2>Hệ Thống Nhận Diện Khuôn Mặt</h2>
+
+    <div class="container">
+        <!-- Khung chứa Camera -->
+        <div class="video-section">
+            <video id="video" width="640" height="480" autoplay muted playsinline></video>
+            <canvas id="overlay"></canvas>
+        </div>
+
+        <!-- Khung chứa thông tin -->
+        <div class="info-section">
+            <div id="status" class="status-box loading">1. Đang khởi tạo hệ thống...</div>
+            
+            <div id="resultCard" class="result-card">
+                <h3>Kết quả nhận diện:</h3>
+                <p><strong>Mã NV:</strong> <span id="res-mnv">...</span></p>
+                <p><strong>Họ tên:</strong> <span id="res-name">...</span></p>
+                <p><strong>Độ tin cậy:</strong> <span id="res-score">...</span></p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const video = document.getElementById('video');
+        const overlay = document.getElementById('overlay');
+        const statusEl = document.getElementById('status');
+        const resultCard = document.getElementById('resultCard');
+        
+        const API_URL = 'https://script.google.com/macros/s/AKfycbzwoSShI37Pg6P4GhIYSwpcGkN_LeO0fLldHWBvYyz96PFx_qCAfV7IE3mBxFheZXrDNQ/exec';
+        const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/';
+        
+        let faceMatcher = null;
+
+        function updateStatus(message, type = 'loading') {
+            statusEl.className = `status-box ${type}`;
+            statusEl.innerText = message;
+        }
+
+        async function init() {
+            try {
+                // 1. Tải Models
+                updateStatus('Đang tải mô hình AI nhận diện...', 'loading');
+                await Promise.all([
+                    faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL),
+                    faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+                    faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
+                ]);
+
+                // 2. Lấy dữ liệu từ Google Apps Script API
+                updateStatus('Đang lấy dữ liệu nhân viên từ API...', 'loading');
+                const response = await fetch(API_URL);
+                const result = await response.json();
+
+                if (result.status === "success" && result.data && result.data.length > 0) {
+                    // 3. Chuyển đổi dữ liệu API thành định dạng của face-api
+                    const labeledDescriptors = result.data.map(person => {
+                        // Chuyển mảng số thành Float32Array bắt buộc
+                        const float32Array = new Float32Array(person.embeddings);
+                        // Lưu Label dạng JSON String để dễ dàng bóc tách thông tin sau này
+                        const labelData = JSON.stringify({ mnv: person.mnv, name: person.hoTen });
+                        return new faceapi.LabeledFaceDescriptors(labelData, [float32Array]);
+                    });
+
+                    // Khởi tạo thuật toán so khớp (0.45 là ngưỡng dung sai, càng thấp càng khắt khe)
+                    faceMatcher = new faceapi.FaceMatcher(labeledDescriptors, 0.45);
+                    
+                    updateStatus(`Đã tải ${result.total} nhân sự. Đang bật Camera...`, 'loading');
+                    startWebcam();
+                } else {
+                    updateStatus('API không trả về dữ liệu nhân viên!', 'error');
+                }
+            } catch (error) {
+                console.error(error);
+                updateStatus('Lỗi khởi tạo: ' + error.message, 'error');
+            }
+        }
+
+        function startWebcam() {
+            navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } })
+                .then(stream => {
+                    video.srcObject = stream;
+                    updateStatus('Hệ thống sẵn sàng quét', 'success');
+                })
+                .catch(err => {
+                    updateStatus('Lỗi Camera: Hãy cấp quyền truy cập webcam.', 'error');
+                });
+        }
+
+        // Khi video bắt đầu chạy, tiến hành quét liên tục
+        video.addEventListener('play', () => {
+            const displaySize = { width: video.width, height: video.height };
+            faceapi.matchDimensions(overlay, displaySize);
+
+            setInterval(async () => {
+                if (!faceMatcher) return;
+
+                // Phát hiện khuôn mặt
+                const detections = await faceapi.detectAllFaces(video)
+                    .withFaceLandmarks()
+                    .withFaceDescriptors();
+                    
+                const resizedDetections = faceapi.resizeResults(detections, displaySize);
+                
+                // Xóa khung vẽ cũ
+                const ctx = overlay.getContext('2d');
+                ctx.clearRect(0, 0, overlay.width, overlay.height);
+
+                // Nếu không có ai trong khung hình thì ẩn kết quả
+                if(resizedDetections.length === 0) {
+                    resultCard.style.display = 'none';
+                }
+
+                // Nhận diện và vẽ
+                resizedDetections.forEach(detection => {
+                    const match = faceMatcher.findBestMatch(detection.descriptor);
+                    const box = detection.detection.box;
+
+                    let drawLabel = "Không xác định";
+                    let boxColor = "#f44336"; // Màu đỏ cho unknown
+
+                    if (match.label !== 'unknown') {
+                        boxColor = "#4caf50"; // Màu xanh cho người đã biết
+                        try {
+                            const personData = JSON.parse(match.label);
+                            drawLabel = personData.name;
+                            
+                            // Hiển thị lên UI bên phải
+                            resultCard.style.display = 'block';
+                            document.getElementById('res-mnv').innerText = personData.mnv;
+                            document.getElementById('res-name').innerText = personData.name;
+                            // Quy đổi distance sang % độ tin cậy (tương đối)
+                            const confidence = Math.round((1 - match.distance) * 100);
+                            document.getElementById('res-score').innerText = `${confidence}%`;
+
+                        } catch (e) {
+                            console.error("Lỗi parse JSON label", e);
+                        }
+                    } else {
+                        // Ẩn kết quả bên phải nếu là người lạ
+                        resultCard.style.display = 'none';
+                    }
+
+                    // Vẽ khung và chữ lên Video
+                    const drawBox = new faceapi.draw.DrawBox(box, { 
+                        label: drawLabel, 
+                        lineWidth: 2, 
+                        boxColor: boxColor,
+                        drawLabelOptions: { fontSize: 16 }
+                    });
+                    drawBox.draw(overlay);
+                });
+            }, 200); // Quét mỗi 200ms để giảm tải cho CPU
+        });
+
+        // Kích hoạt
+        init();
+    </script>
+</body>
+</html>
