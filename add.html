@@ -32,7 +32,7 @@
     .section-card { display: flex; flex-direction: column; gap: 14px; }
     #section-scan { display: none; } /* Mặc định ẩn phần quét, hiện phần nhập trước */
 
-    /* Khung Camera cho Quét 7s */
+    /* Khung Camera cho Quét 2s */
     .camera-container {
       position: relative; width: 100%; aspect-ratio: 1; 
       background: #0F172A; border-radius: 24px; overflow: hidden;
@@ -63,9 +63,9 @@
     .icon-btn:hover { background: rgba(0, 0, 0, 0.5); transform: scale(1.05) rotate(180deg); }
     .icon-btn svg { width: 22px; height: 22px; stroke: currentColor; }
 
-    /* Thanh tiến trình đếm ngược 7s */
+    /* Thanh tiến trình đếm ngược 2s */
     .progress-container { width: 100%; background: #E2E8F0; height: 10px; border-radius: 5px; overflow: hidden; }
-    .progress-bar { width: 0%; height: 100%; background: #6366F1; transition: width 0.2s linear; }
+    .progress-bar { width: 0%; height: 100%; background: #6366F1; transition: width 0.1s linear; }
 
     /* Input & Trạng thái */
     .input-group { display: flex; flex-direction: column; gap: 6px; }
@@ -114,7 +114,7 @@
       <button class="btn btn-primary" onclick="goToScanSection()">Tiếp tục: Quét Khuôn Mặt ➡</button>
     </div>
 
-    <!-- PHẦN 2: QUÉT KHUÔN MẶT CỐ ĐỊNH 7 GIÂY -->
+    <!-- PHẦN 2: QUÉT KHUÔN MẶT CỐ ĐỊNH 2 GIÂY -->
     <div id="section-scan" class="section-card">
       <div class="camera-container" id="container">
         <button class="icon-btn" onclick="switchCamera()" title="Đổi camera">
@@ -131,9 +131,9 @@
         <video id="video" autoplay muted playsinline></video>
       </div>
 
-      <div id="status-box" class="status-box">Đưa mặt vào vòng tròn và giữ cố định...</div>
+      <div id="status-box" class="status-box">Đưa mặt vào vòng tròn và giữ cố định trong 2 giây...</div>
 
-      <!-- Thanh tiến trình đếm ngược 7 giây -->
+      <!-- Thanh tiến trình đếm ngược 2s -->
       <div class="progress-container">
         <div id="progress-bar" class="progress-bar"></div>
       </div>
@@ -150,9 +150,9 @@
     let currentStream = null;
     let currentFacingMode = "user";
     let isAiLoaded = false;
-    let scanTimer = 0; // Bộ đếm thời gian giữ khuôn mặt (tổng mục tiêu 7000ms = 7s)
+    let scanTimer = 0; 
     let scanInterval = null;
-    let collectedDescriptors = []; // Lưu các vector mẫu để lấy trung bình tăng độ chính xác
+    let collectedDescriptors = []; 
 
     const video = document.getElementById('video');
     const statusBox = document.getElementById('status-box');
@@ -161,7 +161,7 @@
     
     const sectionInfo = document.getElementById('section-info');
     const sectionScan = document.getElementById('section-scan');
-    const stepTitle = document.getElementById('step-title');
+    let stepTitle = document.getElementById('step-title');
     const inputName = document.getElementById('empName');
 
     async function initAI() {
@@ -176,7 +176,6 @@
       }
     }
 
-    // Chuyển sang Phần 2: Quét khuôn mặt
     function goToScanSection() {
       const name = inputName.value.trim();
       if (!name) {
@@ -196,7 +195,6 @@
       startCamera(currentFacingMode);
     }
 
-    // Quay lại Phần 1
     function backToInfoSection() {
       stopScanProcess();
       if (currentStream) currentStream.getTracks().forEach(t => t.stop());
@@ -218,7 +216,7 @@
         
         video.onloadedmetadata = () => {
           video.play();
-          beginFaceCountdown(); // Bắt đầu chạy vòng lặp quét 7s
+          beginFaceCountdown(); 
         };
       } catch(err) {
         alert("Không thể bật được Camera!");
@@ -238,16 +236,16 @@
       guideCircle.classList.remove('active');
     }
 
-    // HỆ THỐNG ĐẾM NGƯỢC 7 GIÂY & KIỂM TRA KHUÔN MẶT CỐ ĐỊNH
+    // HỆ THỐNG ĐẾM NGƯỢC 2 GIÂY
     function beginFaceCountdown() {
       stopScanProcess();
       collectedDescriptors = [];
       
       const options = new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.6 });
-      const targetTimeMs = 7000; // Đủ đúng 7 giây
-      const intervalMs = 100;    // Kiểm tra mỗi 0.1 giây
+      const targetTimeMs = 2000; // Đặt đúng 2 giây
+      const intervalMs = 80;     // Tần suất quét nhanh mượt
 
-      statusBox.innerText = "Đưa mặt vào giữa vòng tròn và giữ cố định...";
+      statusBox.innerText = "Giữ cố định mặt trong vòng tròn (2s)...";
       statusBox.style.backgroundColor = "#EEF2FF";
       statusBox.style.color = "#4338CA";
 
@@ -257,25 +255,22 @@
         const detection = await faceapi.detectSingleFace(video, options).withFaceLandmarks().withFaceDescriptor();
 
         if (detection) {
-          // Kiểm tra xem khuôn mặt có nằm tương đối ở giữa khung hình không (tránh lệch ra ngoài)
           const box = detection.detection.box;
           const videoCenter = { x: video.videoWidth / 2, y: video.videoHeight / 2 };
           const faceCenter = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
-          
-          // Khoảng cách cho phép lệch khỏi tâm
-          const tolerance = 150; 
+          const tolerance = 160; 
 
+          // Kiểm tra xem khuôn mặt có nằm trong vùng tâm khung hình không
           if (Math.abs(faceCenter.x - videoCenter.x) < tolerance && Math.abs(faceCenter.y - videoCenter.y) < tolerance) {
-            // MẶT ĐÚNG VỊ TRÍ: TIẾP TỤC ĐẾM NGƯỢC
             scanTimer += intervalMs;
             collectedDescriptors.push(detection.descriptor);
             
             const percent = (scanTimer / targetTimeMs) * 100;
             progressBar.style.width = `${percent}%`;
             guideCircle.classList.add('active');
-            statusBox.innerText = `Đang quét cố định... (${(scanTimer/1000).toFixed(1)}s / 7s)`;
+            statusBox.innerText = `Đang quét cố định... (${(scanTimer/1000).toFixed(1)}s / 2s)`;
 
-            // HOÀN THÀNH ĐỦ 7 GIÂY
+            // ĐỦ 2 GIÂY -> HOÀN TẤT
             if (scanTimer >= targetTimeMs) {
               stopScanProcess();
               statusBox.innerText = "🎉 Quét thành công! Đang lưu thông tin...";
@@ -285,12 +280,12 @@
               executeSaveData();
             }
           } else {
-            // LỆCH KHỎI KHUNG -> RESET ĐẾM LẠI TỪ ĐẦU
-            resetCountdown("⚠️ Mặt bị lệch khỏi vòng tròn! Đếm lại từ đầu.");
+            // LỆCH KHỎI VÒNG TRÒN -> TỰ ĐỘNG RESET ĐẾM LẠI TỪ ĐẦU
+            resetCountdown("⚠️ Mặt dịch chuyển khỏi vòng tròn! Đếm lại từ đầu.");
           }
         } else {
-          // KHÔNG THẤY MẶT -> RESET ĐẾM LẠI TỪ ĐẦU
-          resetCountdown("⚠️️ Không tìm thấy khuôn mặt! Giữ mặt trong vòng tròn.");
+          // MẤT DẤU KHUÔN MẶT -> RESET ĐẾM LẠI TỪ ĐẦU
+          resetCountdown("⚠ Không thấy khuôn mặt! Đưa mặt vào vòng tròn.");
         }
       }, intervalMs);
     }
@@ -307,7 +302,6 @@
       }
     }
 
-    // LẤY VECTOR TRUNG BÌNH CỦA 7 GIÂY QUÉT ĐỂ TĂNG ĐỘ CHÍNH XÁC TUYỆT ĐỐI
     function getAverageDescriptor(descriptors) {
       const len = descriptors[0].length;
       const avg = new Float32Array(len);
@@ -321,11 +315,9 @@
       return Array.from(avg);
     }
 
-    // GỬI DỮ LIỆU LÊN GOOGLE SHEETS & DRIVE
     async function executeSaveData() {
       if (currentStream) currentStream.getTracks().forEach(t => t.stop());
 
-      // Chụp lại 1 bức ảnh đại diện cuối cùng từ video lúc hoàn tất 7s
       const canvas = document.createElement('canvas');
       canvas.width = video.videoWidth; canvas.height = video.videoHeight;
       const ctx = canvas.getContext('2d');
@@ -335,10 +327,9 @@
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       const imageBase64 = canvas.toDataURL('image/jpeg', 0.85);
 
-      // Tính toán vector trung bình qua 7s quét
       const finalDescriptor = getAverageDescriptor(collectedDescriptors);
 
-      // Định dạng thời gian "hh:mm:ss dd/mm/yyyy"
+      // Thời gian định dạng "hh:mm:ss dd/mm/yyyy"
       const now = new Date();
       const hh = String(now.getHours()).padStart(2, '0');
       const mm = String(now.getMinutes()).padStart(2, '0');
@@ -365,7 +356,7 @@
         if (res.status === "success") {
           alert("🎉 " + res.message);
           inputName.value = "";
-          backToInfoSection(); // Quay về phần 1 để đăng ký người tiếp theo
+          backToInfoSection(); 
         } else {
           alert("Lỗi từ server: " + res.message);
           backToInfoSection();
