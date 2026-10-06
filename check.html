@@ -8,7 +8,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.min.js"></script>
     <style>
         :root {
-            --primary: #00bfa5; /* Xanh ngọc */
+            --primary: #00bfa5;
             --bg-gradient: linear-gradient(135deg, #e4c1f9 0%, #a9def9 100%);
             --card-bg: #ffffff;
             --result-bg: #eaffea;
@@ -27,7 +27,6 @@
             padding: 20px;
         }
 
-        /* Thẻ bao bọc ngoài cùng (Màu trắng) */
         .main-card {
             background: var(--card-bg);
             border-radius: 24px;
@@ -44,102 +43,121 @@
         .scanner-container {
             position: relative;
             width: 100%;
-            aspect-ratio: 3/4; /* Tỷ lệ khung hình dọc */
+            aspect-ratio: 3/4;
             border-radius: 16px;
             overflow: hidden;
             background: #000;
         }
 
-        video, canvas {
+        video { 
+            width: 100%; height: 100%; 
+            object-fit: cover; display: block; 
             transform: scaleX(-1);
             -webkit-transform: scaleX(-1);
         }
 
-        video { width: 100%; height: 100%; object-fit: cover; display: block; }
-        canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 5; }
+        /* KHUNG NGẮM CỐ ĐỊNH */
+        .viewfinder {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 65%;
+            aspect-ratio: 3/4;
+            border: 2px solid rgba(255, 255, 255, 0.6);
+            border-radius: 16px;
+            z-index: 10;
+            box-shadow: 0 0 0 2000px rgba(0, 0, 0, 0.45);
+            overflow: hidden;
+        }
 
-        /* Tia quét ngang màu xanh tím */
+        .viewfinder::before, .viewfinder::after {
+            content: ''; position: absolute; width: 100%; height: 100%;
+            border: 4px solid var(--primary); border-radius: 16px;
+            z-index: 11; box-sizing: border-box;
+            clip-path: polygon(0 0, 20% 0, 20% 100%, 0 100%, 0 20%, 100% 20%, 100% 0, 80% 0, 80% 100%, 100% 100%, 100% 80%, 0 80%);
+        }
+
         .scan-line {
             position: absolute;
-            width: 100%;
-            height: 3px;
-            background: rgba(100, 100, 255, 0.8);
-            box-shadow: 0 0 20px rgba(100, 100, 255, 0.8);
-            top: 0; left: 0; z-index: 10;
-            animation: scan 2.5s linear infinite;
+            width: 100%; height: 3px;
+            background: var(--primary);
+            box-shadow: 0 0 15px var(--primary);
+            top: 0; left: 0; z-index: 12;
+            animation: scan 2s linear infinite;
         }
 
         @keyframes scan {
-            0% { top: 10%; opacity: 0; }
+            0% { top: 0%; opacity: 0; }
             10% { opacity: 1; }
             90% { opacity: 1; }
-            100% { top: 90%; opacity: 0; }
+            100% { top: 100%; opacity: 0; }
         }
 
-        /* Nút lật camera góc phải trên */
         .camera-btn {
-            position: absolute;
-            top: 12px; right: 12px;
+            position: absolute; top: 12px; right: 12px;
             width: 40px; height: 40px;
-            background: rgba(0, 0, 0, 0.4);
-            backdrop-filter: blur(4px);
+            background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(4px);
             border-radius: 50%;
             display: flex; justify-content: center; align-items: center;
             z-index: 15; border: none; cursor: pointer; color: white;
         }
 
-        /* Thẻ kết quả màu xanh nhạt */
+        /* -----------------------------------
+           THẺ KẾT QUẢ - SỬA LỖI GIẬT MÀN HÌNH 
+           ----------------------------------- */
+        .result-wrapper {
+            /* Wrapper luôn giữ một khoảng trống cố định bằng chiều cao của thẻ kết quả */
+            min-height: 80px; 
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
         .result-card {
             background: var(--result-bg);
             border: 2px solid var(--result-border);
-            border-radius: 16px;
-            padding: 12px 16px;
-            display: flex; /* Mặc định dùng js để đổi thành flex khi nhận diện được */
-            align-items: center;
-            gap: 16px;
-            display: none;
-            animation: slideUp 0.3s ease-out;
+            border-radius: 16px; padding: 12px 16px;
+            display: flex; align-items: center; gap: 16px;
+            width: 100%;
+            /* Thay vì ẩn hoàn toàn (display:none), ta làm trong suốt để giữ khung */
+            opacity: 0; 
+            visibility: hidden;
+            transform: translateY(10px);
+            transition: all 0.3s ease-out;
         }
 
-        @keyframes slideUp {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
+        /* Khi có class 'active', thẻ kết quả sẽ mờ dần lên */
+        .result-card.active {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
         }
 
-        /* Avatar */
         .avatar {
-            width: 50px; height: 50px;
-            border-radius: 12px;
-            object-fit: cover;
-            border: 2px solid #4caf50;
-            background-color: #fff;
+            width: 50px; height: 50px; border-radius: 12px;
+            object-fit: cover; border: 2px solid #4caf50; background-color: #fff;
         }
 
-        /* Thông tin chữ */
         .info-col { display: flex; flex-direction: column; justify-content: center; }
         .id-text { color: var(--primary); font-size: 13px; font-weight: 700; text-transform: uppercase; margin-bottom: 2px; }
         .name-text { color: var(--text-dark); font-size: 18px; font-weight: 700; }
-
-        /* Trạng thái hệ thống (Hiển thị khi đang load) */
-        #status-msg {
-            text-align: center; font-size: 14px; font-weight: 600; color: #666;
-            padding: 10px 0;
-        }
+        #status-msg { text-align: center; font-size: 14px; font-weight: 600; color: #666; padding: 5px 0; }
     </style>
 </head>
 <body>
 
     <div class="main-card">
-        <!-- Trạng thái lúc load -->
         <div id="status-msg">Đang khởi tạo hệ thống...</div>
 
         <!-- Khung Camera -->
         <div class="scanner-container">
-            <div class="scan-line"></div>
             <video id="video" autoplay muted playsinline></video>
-            <canvas id="overlay"></canvas>
             
-            <!-- Nút lật camera (UI) -->
+            <!-- KHUNG NGẮM CỐ ĐỊNH -->
+            <div class="viewfinder">
+                <div class="scan-line"></div>
+            </div>
+            
             <button class="camera-btn" onclick="toggleCamera()">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
@@ -149,20 +167,22 @@
             </button>
         </div>
 
-        <!-- Thẻ kết quả -->
-        <div id="resultCard" class="result-card">
-            <!-- Đặt ảnh mặc định, sẽ thay thế bằng ảnh từ DriveUrl nếu có -->
-            <img id="res-avatar" class="avatar" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23ccc'><path d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/></svg>">
-            <div class="info-col">
-                <span class="id-text">MÃ ID: <span id="res-mnv">...</span></span>
-                <span class="name-text" id="res-name">...</span>
+        <!-- Vùng chứa Thẻ kết quả (Giữ không cho giật) -->
+        <div class="result-wrapper">
+            <!-- Thẻ kết quả -->
+            <div id="resultCard" class="result-card">
+                <!-- Avatar mặc định nếu ảnh bị lỗi sẽ fallback về ảnh này -->
+                <img id="res-avatar" class="avatar" src="https://i.imgur.com/6VBx3io.png" onerror="this.src='https://i.imgur.com/6VBx3io.png'">
+                <div class="info-col">
+                    <span class="id-text">MÃ ID: <span id="res-mnv">...</span></span>
+                    <span class="name-text" id="res-name">...</span>
+                </div>
             </div>
         </div>
     </div>
 
     <script>
         const video = document.getElementById('video');
-        const overlay = document.getElementById('overlay');
         const resultCard = document.getElementById('resultCard');
         const statusMsg = document.getElementById('status-msg');
         
@@ -172,13 +192,15 @@
         let faceMatcher = null;
         let isDetecting = false;
         let useFrontCamera = true;
+        let scanTimeout = null;
 
         // Hàm chuyển đổi Link Drive thành Link ảnh trực tiếp
         function getDirectDriveUrl(url) {
-            if (!url) return '';
+            if (!url) return 'https://i.imgur.com/6VBx3io.png';
             const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
             if (match && match[1]) {
-                return `https://drive.google.com/uc?export=view&id=${match[1]}`;
+                // Sử dụng API lấy ảnh trực tiếp của Google
+                return `https://drive.google.com/uc?id=${match[1]}`;
             }
             return url;
         }
@@ -201,17 +223,12 @@
                 if (result.status === "success" && result.data) {
                     const labeledDescriptors = result.data.map(person => {
                         const float32Array = new Float32Array(person.embeddings);
-                        // Đóng gói mnv, tên và cả driveUrl vào label để tí nữa trích xuất ra
-                        const labelData = JSON.stringify({ 
-                            mnv: person.mnv, 
-                            name: person.hoTen,
-                            driveUrl: person.driveUrl 
-                        });
+                        const labelData = JSON.stringify({ mnv: person.mnv, name: person.hoTen, driveUrl: person.driveUrl });
                         return new faceapi.LabeledFaceDescriptors(labelData, [float32Array]);
                     });
 
                     faceMatcher = new faceapi.FaceMatcher(labeledDescriptors, 0.45);
-                    statusMsg.style.display = 'none'; // Ẩn trạng thái khi load xong
+                    statusMsg.style.display = 'none';
                     startWebcam();
                 } else {
                     statusMsg.innerText = 'Dữ liệu API trống!';
@@ -246,61 +263,52 @@
             const detections = await faceapi.detectAllFaces(video, new faceapi.TinyFaceDetectorOptions())
                 .withFaceLandmarks()
                 .withFaceDescriptors();
+
+            let matchedPerson = null;
+
+            if (detections.length > 0) {
+                const detection = detections[0]; 
+                const match = faceMatcher.findBestMatch(detection.descriptor);
+
+                if (match.label !== 'unknown') {
+                    try {
+                        matchedPerson = JSON.parse(match.label);
+                    } catch (e) { console.error(e); }
+                }
+            }
+
+            if (matchedPerson) {
+                // Hiển thị khung (Thêm class active thay vì đổi display)
+                resultCard.classList.add('active');
+                document.getElementById('res-mnv').innerText = matchedPerson.mnv;
+                document.getElementById('res-name').innerText = matchedPerson.name;
                 
-            const displaySize = { width: video.clientWidth, height: video.clientHeight };
-            const resizedDetections = faceapi.resizeResults(detections, displaySize);
-            
-            const ctx = overlay.getContext('2d');
-            ctx.clearRect(0, 0, overlay.width, overlay.height);
-
-            if (resizedDetections.length === 0) {
-                resultCard.style.display = 'none';
-            } else {
-                resizedDetections.forEach(detection => {
-                    const match = faceMatcher.findBestMatch(detection.descriptor);
-                    const box = detection.detection.box;
-
-                    let drawLabel = "Không xác định";
-                    let boxColor = "#ff5252"; // Đỏ nếu không nhận ra
-
-                    if (match.label !== 'unknown') {
-                        boxColor = "#00bfa5"; // Xanh ngọc giống hình[span_2](start_span)[span_2](end_span)
-                        try {
-                            const personData = JSON.parse(match.label);
-                            drawLabel = personData.name;
-                            
-                            // Cập nhật thẻ kết quả
-                            resultCard.style.display = 'flex';
-                            document.getElementById('res-mnv').innerText = personData.mnv;
-                            document.getElementById('res-name').innerText = personData.name;
-                            
-                            // Cập nhật Avatar từ link Drive
-                            if(personData.driveUrl) {
-                                document.getElementById('res-avatar').src = getDirectDriveUrl(personData.driveUrl);
-                            }
-                        } catch (e) { console.error(e); }
-                    } else {
-                        resultCard.style.display = 'none';
+                // Cập nhật Avatar
+                if(matchedPerson.driveUrl) {
+                    const newImgSrc = getDirectDriveUrl(matchedPerson.driveUrl);
+                    const currentImgSrc = document.getElementById('res-avatar').src;
+                    
+                    // Chỉ đổi src nếu ảnh mới khác ảnh cũ (tránh tải lại ảnh liên tục làm giật trang)
+                    if (currentImgSrc !== newImgSrc) {
+                        document.getElementById('res-avatar').src = newImgSrc;
                     }
+                }
+                
+                // Giữ khung kết quả hiển thị thêm 2 giây kể cả khi người dùng quay mặt đi chỗ khác
+                clearTimeout(scanTimeout);
+                scanTimeout = setTimeout(() => {
+                    resultCard.classList.remove('active');
+                }, 2000);
 
-                    // Vẽ khung định vị màu xanh ngọc với nền chữ xanh[span_3](start_span)[span_3](end_span)
-                    const drawBox = new faceapi.draw.DrawBox(box, { 
-                        label: drawLabel, 
-                        lineWidth: 2, 
-                        boxColor: boxColor,
-                        drawLabelOptions: { fontSize: 14, fontColor: '#fff', backgroundColor: boxColor, padding: 4 }
-                    });
-                    drawBox.draw(overlay);
-                });
+            } else if (!scanTimeout) {
+                // Chỉ ẩn nếu không trong thời gian chờ 2 giây
+                resultCard.classList.remove('active');
             }
 
             setTimeout(() => { requestAnimationFrame(detectFaces); }, 80);
         }
 
         video.addEventListener('play', () => {
-            overlay.width = video.clientWidth;
-            overlay.height = video.clientHeight;
-            
             if (!isDetecting) {
                 isDetecting = true;
                 detectFaces();
