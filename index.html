@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Face ID - Check In</title>
+  <title>Face ID - Check In (High Accuracy)</title>
   
   <script defer src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -42,22 +42,20 @@
       position: absolute; width: 100%; height: 4px;
       background: linear-gradient(90deg, transparent, rgba(99, 102, 241, 0.8), transparent);
       box-shadow: 0 0 15px rgba(99, 102, 241, 0.8);
-      top: 0; left: 0; animation: scan 2.5s infinite linear; z-index: 5; display: none;
+      top: 0; left: 0; animation: scan 2s infinite linear; z-index: 5; display: none;
     }
     @keyframes scan { 0% { top: 0%; opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { top: 100%; opacity: 0; } }
 
-    /* Nút đổi camera với biểu tượng SVG chuyên nghiệp */
     .icon-btn {
       position: absolute; top: 16px; right: 16px; width: 46px; height: 46px;
       background: rgba(0, 0, 0, 0.3); color: #FFFFFF; border: 1px solid rgba(255, 255, 255, 0.3);
       border-radius: 50%; display: flex; align-items: center; justify-content: center;
       cursor: pointer; backdrop-filter: blur(10px); z-index: 10;
-      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      transition: all 0.3s ease; box-shadow: 0 4px 12px rgba(0,0,0,0.2);
     }
     .icon-btn:hover { background: rgba(0, 0, 0, 0.5); transform: scale(1.05) rotate(180deg); }
     .icon-btn svg { width: 22px; height: 22px; stroke: currentColor; }
 
-    /* Hộp Thông Tin Phía Dưới */
     .info-box {
       background: #F8FAFC; border: 2px solid #E2E8F0; border-radius: 20px; padding: 16px;
       display: flex; align-items: center; gap: 16px; transition: all 0.3s ease; min-height: 90px;
@@ -70,10 +68,6 @@
     .info-box.success { background: #ECFDF5; border-color: #A7F3D0; box-shadow: 0 8px 16px rgba(16, 185, 129, 0.1); }
     .info-box.success .info-visual { background: #10B981; border: 2px solid #34D399; }
     .info-box.success .info-subtitle { color: #10B981; }
-
-    .info-box.danger { background: #FFF1F2; border-color: #FECDD3; box-shadow: 0 8px 16px rgba(244, 63, 94, 0.1); }
-    .info-box.danger .info-visual { background: #F43F5E; box-shadow: 0 0 15px rgba(244, 63, 94, 0.4); }
-    .info-box.danger .info-subtitle { color: #F43F5E; }
 
     .info-visual {
       width: 60px; height: 60px; flex-shrink: 0; background: #94A3B8; 
@@ -91,8 +85,6 @@
 
   <div class="app-card">
     <div class="camera-container" id="container">
-      
-      <!-- Nút đổi camera -->
       <button class="icon-btn" onclick="switchCamera()" title="Đổi camera">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
           <path d="M20 9V7a2 2 0 0 0-2-2h-3.28a2 2 0 0 1-1.34-.53l-1.06-1.06A2 2 0 0 0 10.9 3H7a2 2 0 0 0-2 2v4"></path>
@@ -234,7 +226,10 @@
             } catch (err) { console.error("Lỗi parse:", err); }
           }
           if (labeledFaceDescriptors.length > 0) {
-            faceMatcher = new faceapi.FaceMatcher(labeledFaceDescriptors, 0.45);
+            
+            // 🚀 BƯỚC NÂNG CẤP 1: GIẢM NGƯỠNG TỪ 0.45 XUỐNG 0.38 (AI CHỈ NHẬN KHI KHUÔN MẶT ĐẠT ĐỘ KHỚP CAO NHẤT)
+            faceMatcher = new faceapi.FaceMatcher(labeledFaceDescriptors, 0.38);
+            
             startSmoothRecognition();
           } else {
             updateStatusUI('scanning', '⏳', 'Hệ thống sẵn sàng', 'Chờ dữ liệu');
@@ -243,13 +238,13 @@
       } catch (error) { updateStatusUI('danger', '🔌', 'Lỗi kết nối máy chủ', 'Hệ Thống'); }
     }
 
-    // LUỒNG QUÉT LIÊN TỤC VÀ KHÔNG BỊ DỪNG
     async function startSmoothRecognition() {
       isRunning = true;
       scanLine.style.display = 'block'; 
       updateStatusUI('scanning', '🎯', 'Đang quét khuôn mặt...', 'Sẵn Sàng');
 
-      const options = new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 });
+      // 🚀 BƯỚC NÂNG CẤP 2: TĂNG inputSize LÊN 416 (GIÚP AI NHÌN RÕ HƠN, XA HƠN) & scoreThreshold LÊN 0.6
+      const options = new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.6 });
       const ctx = canvas.getContext('2d');
 
       const detectFrame = async () => {
@@ -270,13 +265,11 @@
             const isStranger = bestMatch.label === "unknown";
 
             if (isStranger) {
-              // Bỏ qua người lạ trong im lặng (KHÔNG báo lỗi, KHÔNG dùng return để ngắt vòng lặp quét)
               if (lastScanLabel !== "scanning") {
                 updateStatusUI('scanning', '🎯', 'Đang quét khuôn mặt...', 'Sẵn Sàng');
                 lastScanLabel = "scanning";
               }
             } else {
-              // Khi đúng nhân sự, vẽ khung
               const drawBox = new faceapi.draw.DrawBox(box, {
                 label: employeeData[bestMatch.label].name,
                 boxColor: "#10B981",
@@ -288,7 +281,6 @@
               });
               drawBox.draw(canvas);
 
-              // Cập nhật thông tin nhân sự bên dưới
               if (lastScanLabel !== bestMatch.label) {
                 lastScanLabel = bestMatch.label;
                 const emp = employeeData[bestMatch.label];
@@ -298,11 +290,10 @@
           }
         } catch (err) { console.error("Lỗi AI:", err); }
 
-        // Gọi lại hàm detectFrame liên tục để tạo vòng lặp không bao giờ dừng
         if (isRunning) requestAnimationFrame(detectFrame);
       };
       
-      detectFrame(); // Khởi động vòng lặp
+      detectFrame();
     }
 
     window.onload = loadModels;
