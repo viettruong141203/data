@@ -174,6 +174,18 @@
       }
     }
 
+    // Tắt camera hoàn toàn để giải phóng tài nguyên
+    function stopCamera() {
+      isRunning = false;
+      if (currentStream) {
+        currentStream.getTracks().forEach(track => track.stop());
+        currentStream = null;
+      }
+      if (video) {
+        video.srcObject = null;
+      }
+    }
+
     async function loadModels() {
       const MODEL_URL = 'https://justadudewhohacks.github.io/face-api.js/models';
       try {
@@ -189,13 +201,10 @@
     }
 
     async function startCamera(facingMode) {
-      isRunning = false;
-      loadingOverlay.style.display = 'flex'; // Bật màn hình loading
+      stopCamera();
+      loadingOverlay.style.display = 'flex';
       
-      if (currentStream) currentStream.getTracks().forEach(track => track.stop());
-
       try {
-        // Tăng độ phân giải lên Full HD (1080x1920) để quét nét hơn
         const constraints = { video: { width: { ideal: 1080 }, height: { ideal: 1920 }, facingMode: facingMode } };
         currentStream = await navigator.mediaDevices.getUserMedia(constraints);
         video.srcObject = currentStream;
@@ -251,19 +260,19 @@
             faceMatcher = new faceapi.FaceMatcher(labeledFaceDescriptors, 0.38);
             startSmoothRecognition();
           } else {
-            loadingOverlay.style.display = 'none'; // Ẩn loading
+            loadingOverlay.style.display = 'none';
             updateStatusUI('scanning', '⏳', 'Hệ thống sẵn sàng', 'Chờ dữ liệu');
           }
         }
       } catch (error) { 
-        loadingOverlay.style.display = 'none'; // Ẩn loading
+        loadingOverlay.style.display = 'none'; 
         updateStatusUI('danger', '🔌', 'Lỗi kết nối máy chủ', 'Hệ Thống'); 
       }
     }
 
     async function startSmoothRecognition() {
       isRunning = true;
-      loadingOverlay.style.display = 'none'; // Ẩn màn hình loading khi bắt đầu quét
+      loadingOverlay.style.display = 'none'; 
       updateStatusUI('scanning', '🎯', 'Đang quét khuôn mặt...', 'Sẵn Sàng');
 
       const options = new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.6 });
@@ -292,9 +301,9 @@
                 lastScanLabel = "scanning";
               }
             } else {
-              // Bỏ chữ Họ và tên trên camera, chỉ vẽ mỗi khung vuông
+              // Bỏ chữ Họ và tên trên camera, chỉ vẽ mỗi khung vuông xanh
               const drawBox = new faceapi.draw.DrawBox(box, {
-                boxColor: "#10B981", // Màu khung xanh lá
+                boxColor: "#10B981", 
                 lineWidth: 3
               });
               drawBox.draw(canvas);
@@ -313,6 +322,29 @@
       
       detectFrame();
     }
+
+    // 🚀 LẮNG NGHE SỰ KIỆN: RỜI KHỎI TRANG HOẶC CHUYỂN TAB ĐỂ TẮT CAMERA
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) {
+        // Chuyển qua tab/ứng dụng khác -> Dừng hẳn camera
+        stopCamera();
+        if(canvas) {
+          const ctx = canvas.getContext('2d');
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+        updateStatusUI('scanning', '⏸️', 'Đã tạm dừng camera', 'Hệ Thống');
+      } else {
+        // Quay lại trang -> Tự động bật lại camera và quét tiếp
+        if (faceMatcher) {
+          startCamera(currentFacingMode);
+        }
+      }
+    });
+
+    // Khi đóng hẳn trình duyệt hoặc reload lại trang
+    window.addEventListener("beforeunload", () => {
+      stopCamera();
+    });
 
     window.onload = loadModels;
   </script>
