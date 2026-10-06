@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Face ID - Đăng Ký Nhân Sự (Turbo AI)</title>
+  <title>Face ID - Đăng Ký Nhân Sự (Turbo 0.5s)</title>
   
   <script defer src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -42,10 +42,12 @@
     #video.front-camera { transform: scaleX(-1); }
     #video.back-camera { transform: scaleX(1); }
 
+    /* Vòng tròn định vị luôn hiện mờ ở giữa, sáng lên khi quét thành công */
     .face-guide-circle {
       position: absolute; width: 200px; height: 200px;
-      border: 2px dashed rgba(255, 255, 255, 0.4); border-radius: 50%;
+      border: 2px dashed rgba(255, 255, 255, 0.5); border-radius: 50%;
       pointer-events: none; transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      z-index: 5;
     }
     .face-guide-circle.active { 
       border-color: #34D399; border-style: solid; border-width: 3px;
@@ -108,7 +110,7 @@
       <button class="btn btn-primary" onclick="goToScanSection()">Bắt đầu quét khuôn mặt →</button>
     </div>
 
-    <!-- PHẦN 2: TURBO AI QUÉT LIÊN TỤC -->
+    <!-- PHẦN 2: TURBO AI QUÉT 0.5S -->
     <div id="section-scan" class="section-card">
       <div class="camera-container" id="container">
         <button class="icon-btn" onclick="switchCamera()" title="Đổi camera">
@@ -124,7 +126,7 @@
         <video id="video" autoplay muted playsinline></video>
       </div>
 
-      <div id="status-box" class="status-box">Đang khởi động Turbo AI...</div>
+      <div id="status-box" class="status-box">Đưa mặt vào khung tròn...</div>
 
       <div class="progress-container">
         <div id="progress-bar" class="progress-bar"></div>
@@ -191,6 +193,7 @@
       isScanningActive = false;
       scanTimer = 0;
       progressBar.style.width = '0%';
+      guideCircle.classList.remove('active');
       if (currentStream) currentStream.getTracks().forEach(t => t.stop());
       
       sectionScan.style.display = 'none';
@@ -226,15 +229,14 @@
       startCamera(currentFacingMode);
     }
 
-    // 🚀 TURBO AI LOOP: TỐC ĐỘ XỬ LÝ SIÊU TỐC VÀ CHÍNH XÁC CAO
+    // 🚀 TURBO AI LOOP: TỐC ĐỘ 0.5 GIÂY SIÊU TỐC
     async function runTurboDetectionLoop() {
-      // Dùng inputSize: 320 giúp tăng tốc độ khung hình (FPS) mượt mà tối đa trên mọi thiết bị
       const options = new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.5 });
-      const targetTimeMs = 1200; // 1.2 giây
-      const frameIntervalMs = 30; // Quét dồn dập siêu nhanh (hơn 30 lần/giây)
+      const targetTimeMs = 500; // Giảm xuống chuẩn 0.5 giây
+      const frameIntervalMs = 30; 
       let lastTime = Date.now();
 
-      statusBox.innerText = "Giữ cố định mặt trong vòng tròn...";
+      statusBox.innerText = "Giữ cố định mặt trong khung tròn...";
       statusBox.style.color = "#4338CA";
 
       const detectFrame = async () => {
@@ -251,7 +253,7 @@
               const box = detection.detection.box;
               const videoCenter = { x: video.videoWidth / 2, y: video.videoHeight / 2 };
               const faceCenter = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
-              const tolerance = 180; // Vùng dung sai rộng rãi giúp người dùng dễ căn chỉnh
+              const tolerance = 180; 
 
               if (Math.abs(faceCenter.x - videoCenter.x) < tolerance && Math.abs(faceCenter.y - videoCenter.y) < tolerance) {
                 scanTimer += frameIntervalMs;
@@ -260,7 +262,7 @@
                 const percent = Math.min(100, (scanTimer / targetTimeMs) * 100);
                 progressBar.style.width = `${percent}%`;
                 guideCircle.classList.add('active');
-                statusBox.innerText = `Đang quét... ${(scanTimer/1000).toFixed(1)}s / 1.2s`;
+                statusBox.innerText = `Đang quét nhanh... ${(scanTimer/1000).toFixed(1)}s / 0.5s`;
 
                 if (scanTimer >= targetTimeMs) {
                   isScanningActive = false;
@@ -271,7 +273,7 @@
                   return; 
                 }
               } else {
-                resetCountdown("⚠️ Vui lòng giữ mặt ở giữa vòng tròn");
+                resetCountdown("⚠️ Vui lòng giữ mặt vào giữa vòng tròn");
               }
             } else {
               resetCountdown("🔍 Đang tìm kiếm khuôn mặt...");
