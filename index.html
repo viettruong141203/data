@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Face ID - Check In (High Accuracy)</title>
+  <title>Face ID - Check In</title>
   
   <script defer src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -38,24 +38,32 @@
     canvas.front-camera { transform: scaleX(-1); }
     canvas.back-camera { transform: scaleX(1); }
 
-    .scan-line {
-      position: absolute; width: 100%; height: 4px;
-      background: linear-gradient(90deg, transparent, rgba(99, 102, 241, 0.8), transparent);
-      box-shadow: 0 0 15px rgba(99, 102, 241, 0.8);
-      top: 0; left: 0; animation: scan 2s infinite linear; z-index: 5; display: none;
+    /* Màn hình tải dữ liệu nằm giữa Camera */
+    .loading-overlay {
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(6px);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      color: #FFFFFF; font-weight: 700; font-size: 1rem; z-index: 20; gap: 12px;
     }
-    @keyframes scan { 0% { top: 0%; opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { top: 100%; opacity: 0; } }
+    .spinner {
+      width: 36px; height: 36px; border: 4px solid rgba(255, 255, 255, 0.2);
+      border-top-color: #6366F1; border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin { 100% { transform: rotate(360deg); } }
 
+    /* Nút đổi camera với biểu tượng SVG chuyên nghiệp */
     .icon-btn {
       position: absolute; top: 16px; right: 16px; width: 46px; height: 46px;
       background: rgba(0, 0, 0, 0.3); color: #FFFFFF; border: 1px solid rgba(255, 255, 255, 0.3);
       border-radius: 50%; display: flex; align-items: center; justify-content: center;
-      cursor: pointer; backdrop-filter: blur(10px); z-index: 10;
-      transition: all 0.3s ease; box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      cursor: pointer; backdrop-filter: blur(10px); z-index: 30;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0 4px 12px rgba(0,0,0,0.2);
     }
     .icon-btn:hover { background: rgba(0, 0, 0, 0.5); transform: scale(1.05) rotate(180deg); }
     .icon-btn svg { width: 22px; height: 22px; stroke: currentColor; }
 
+    /* Hộp Thông Tin Phía Dưới */
     .info-box {
       background: #F8FAFC; border: 2px solid #E2E8F0; border-radius: 20px; padding: 16px;
       display: flex; align-items: center; gap: 16px; transition: all 0.3s ease; min-height: 90px;
@@ -68,6 +76,10 @@
     .info-box.success { background: #ECFDF5; border-color: #A7F3D0; box-shadow: 0 8px 16px rgba(16, 185, 129, 0.1); }
     .info-box.success .info-visual { background: #10B981; border: 2px solid #34D399; }
     .info-box.success .info-subtitle { color: #10B981; }
+
+    .info-box.danger { background: #FFF1F2; border-color: #FECDD3; box-shadow: 0 8px 16px rgba(244, 63, 94, 0.1); }
+    .info-box.danger .info-visual { background: #F43F5E; box-shadow: 0 0 15px rgba(244, 63, 94, 0.4); }
+    .info-box.danger .info-subtitle { color: #F43F5E; }
 
     .info-visual {
       width: 60px; height: 60px; flex-shrink: 0; background: #94A3B8; 
@@ -85,6 +97,14 @@
 
   <div class="app-card">
     <div class="camera-container" id="container">
+      
+      <!-- Lớp phủ Đang tải dữ liệu -->
+      <div id="loading-overlay" class="loading-overlay">
+        <div class="spinner"></div>
+        <span>Đang tải dữ liệu...</span>
+      </div>
+
+      <!-- Nút đổi camera -->
       <button class="icon-btn" onclick="switchCamera()" title="Đổi camera">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
           <path d="M20 9V7a2 2 0 0 0-2-2h-3.28a2 2 0 0 1-1.34-.53l-1.06-1.06A2 2 0 0 0 10.9 3H7a2 2 0 0 0-2 2v4"></path>
@@ -95,7 +115,6 @@
         </svg>
       </button>
       
-      <div id="scan-line" class="scan-line"></div>
       <video id="video" autoplay muted playsinline></video>
     </div>
 
@@ -106,7 +125,7 @@
       </div>
       <div class="info-content">
         <span id="info-subtitle" class="info-subtitle">Hệ Thống</span>
-        <span id="info-title" class="info-title">Đang khởi tạo AI...</span>
+        <span id="info-title" class="info-title">Đang khởi tạo...</span>
       </div>
     </div>
   </div>
@@ -125,7 +144,7 @@
 
     const video = document.getElementById('video');
     const container = document.getElementById('container');
-    const scanLine = document.getElementById('scan-line');
+    const loadingOverlay = document.getElementById('loading-overlay');
     
     const infoBox = document.getElementById('info-box');
     const infoIcon = document.getElementById('info-icon');
@@ -171,11 +190,13 @@
 
     async function startCamera(facingMode) {
       isRunning = false;
+      loadingOverlay.style.display = 'flex'; // Bật màn hình loading
       
       if (currentStream) currentStream.getTracks().forEach(track => track.stop());
 
       try {
-        const constraints = { video: { width: { ideal: 720 }, height: { ideal: 960 }, facingMode: facingMode } };
+        // Tăng độ phân giải lên Full HD (1080x1920) để quét nét hơn
+        const constraints = { video: { width: { ideal: 1080 }, height: { ideal: 1920 }, facingMode: facingMode } };
         currentStream = await navigator.mediaDevices.getUserMedia(constraints);
         video.srcObject = currentStream;
 
@@ -196,6 +217,7 @@
         };
       } catch (err) {
         updateStatusUI('danger', '📷', 'Vui lòng cấp quyền', 'Lỗi Camera');
+        loadingOverlay.style.display = 'none';
       }
     }
 
@@ -223,27 +245,27 @@
               if (Array.isArray(parsedArray) && parsedArray.length > 0) {
                 labeledFaceDescriptors.push(new faceapi.LabeledFaceDescriptors(String(empId), [new Float32Array(parsedArray)]));
               }
-            } catch (err) { console.error("Lỗi parse:", err); }
+            } catch (err) {}
           }
           if (labeledFaceDescriptors.length > 0) {
-            
-            // 🚀 BƯỚC NÂNG CẤP 1: GIẢM NGƯỠNG TỪ 0.45 XUỐNG 0.38 (AI CHỈ NHẬN KHI KHUÔN MẶT ĐẠT ĐỘ KHỚP CAO NHẤT)
             faceMatcher = new faceapi.FaceMatcher(labeledFaceDescriptors, 0.38);
-            
             startSmoothRecognition();
           } else {
+            loadingOverlay.style.display = 'none'; // Ẩn loading
             updateStatusUI('scanning', '⏳', 'Hệ thống sẵn sàng', 'Chờ dữ liệu');
           }
         }
-      } catch (error) { updateStatusUI('danger', '🔌', 'Lỗi kết nối máy chủ', 'Hệ Thống'); }
+      } catch (error) { 
+        loadingOverlay.style.display = 'none'; // Ẩn loading
+        updateStatusUI('danger', '🔌', 'Lỗi kết nối máy chủ', 'Hệ Thống'); 
+      }
     }
 
     async function startSmoothRecognition() {
       isRunning = true;
-      scanLine.style.display = 'block'; 
+      loadingOverlay.style.display = 'none'; // Ẩn màn hình loading khi bắt đầu quét
       updateStatusUI('scanning', '🎯', 'Đang quét khuôn mặt...', 'Sẵn Sàng');
 
-      // 🚀 BƯỚC NÂNG CẤP 2: TĂNG inputSize LÊN 416 (GIÚP AI NHÌN RÕ HƠN, XA HƠN) & scoreThreshold LÊN 0.6
       const options = new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.6 });
       const ctx = canvas.getContext('2d');
 
@@ -270,14 +292,10 @@
                 lastScanLabel = "scanning";
               }
             } else {
+              // Bỏ chữ Họ và tên trên camera, chỉ vẽ mỗi khung vuông
               const drawBox = new faceapi.draw.DrawBox(box, {
-                label: employeeData[bestMatch.label].name,
-                boxColor: "#10B981",
-                lineWidth: 3,
-                drawLabelOptions: {
-                  backgroundColor: "#10B981",
-                  fontColor: '#FFFFFF', fontSize: 16, padding: 10
-                }
+                boxColor: "#10B981", // Màu khung xanh lá
+                lineWidth: 3
               });
               drawBox.draw(canvas);
 
@@ -288,7 +306,7 @@
               }
             }
           }
-        } catch (err) { console.error("Lỗi AI:", err); }
+        } catch (err) {}
 
         if (isRunning) requestAnimationFrame(detectFrame);
       };
