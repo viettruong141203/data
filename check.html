@@ -11,75 +11,50 @@
             --primary: #00f2fe;
             --success: #00ff87;
             --danger: #ff0f7b;
-            --bg-gradient: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
-            --glass-bg: rgba(255, 255, 255, 0.05);
-            --glass-border: rgba(255, 255, 255, 0.1);
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Poppins', sans-serif; }
 
-        body {
-            background: var(--bg-gradient);
-            color: #fff;
-            min-height: 100vh;
-            display: flex;
-            align-items: center; /* Căn giữa theo chiều dọc */
-            justify-content: center; /* Căn giữa theo chiều ngang */
-            padding: 20px;
-        }
-
-        .container {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 30px;
+        /* Khóa chết kích thước trang, ẩn thanh cuộn */
+        body, html {
             width: 100%;
-            max-width: 1000px;
-            justify-content: center;
-            align-items: flex-start;
-        }
-
-        /* Glass Panel Effect */
-        .glass-panel {
-            background: var(--glass-bg);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border: 1px solid var(--glass-border);
-            border-radius: 20px;
-            padding: 24px;
-            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
-            flex: 1 1 450px;
-            max-width: 600px;
-        }
-
-        /* Panel kết quả - Ẩn mặc định */
-        .result-panel {
-            flex: 1 1 300px;
-            max-width: 400px;
-            position: relative;
+            height: 100%;
             overflow: hidden;
-            display: none; 
-            animation: fadeIn 0.4s ease-out;
+            background-color: #000;
         }
 
-        .result-panel::before {
-            content: '';
-            position: absolute;
-            top: 0; left: 0; width: 5px; height: 100%;
-            background: var(--success);
-            box-shadow: 0 0 10px var(--success);
-        }
-
-        /* Camera Box */
+        /* Container phủ kín 100% màn hình */
         .scanner-container {
             position: relative;
-            width: 100%;
-            border-radius: 16px;
-            overflow: hidden;
-            background: #000;
-            box-shadow: 0 0 20px rgba(0, 242, 254, 0.2);
-            border: 2px solid rgba(0, 242, 254, 0.3);
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
         }
 
+        /* Lật camera chuẩn gương */
+        video, canvas {
+            transform: scaleX(-1);
+            -webkit-transform: scaleX(-1);
+        }
+
+        /* Video phủ kín, tự cắt cúp phần thừa để không làm méo hình */
+        video {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            object-fit: cover;
+        }
+
+        canvas {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 5;
+        }
+
+        /* Tia quét ngang */
         .scan-line {
             position: absolute;
             width: 100%;
@@ -97,45 +72,63 @@
             100% { top: 0; }
         }
 
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
+        /* Panel kết quả nổi đè lên trên Video (Góc dưới) */
+        .result-panel {
+            position: absolute;
+            bottom: 30px; /* Cách đáy 30px */
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90%;
+            max-width: 400px;
+            z-index: 20;
+            
+            background: rgba(15, 32, 39, 0.75);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 20px;
+            padding: 20px 24px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+            
+            display: none; 
+            animation: popUp 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
         }
 
-        video, canvas {
-            transform: scaleX(-1);
-            -webkit-transform: scaleX(-1);
+        .result-panel::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; width: 6px; height: 100%;
+            background: var(--success);
+            box-shadow: 0 0 15px var(--success);
         }
 
-        video { width: 100%; height: auto; display: block; object-fit: cover; }
-        canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+        @keyframes popUp {
+            from { opacity: 0; transform: translate(-50%, 40px) scale(0.9); }
+            to { opacity: 1; transform: translate(-50%, 0) scale(1); }
+        }
 
         .id-row {
             display: flex; justify-content: space-between; align-items: center;
-            margin-bottom: 12px; border-bottom: 1px dashed rgba(255,255,255,0.1); padding-bottom: 12px;
+            margin-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 12px;
         }
         
         .id-row:last-child { margin-bottom: 0; border-bottom: none; padding-bottom: 0; }
         .id-label { color: #a8b2d1; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; }
         .id-value { font-size: 16px; font-weight: 600; color: #fff; }
-        .id-value.highlight { color: var(--success); text-shadow: 0 0 10px rgba(0, 255, 135, 0.5); font-size: 18px; }
+        .id-value.highlight { color: var(--success); text-shadow: 0 0 10px rgba(0, 255, 135, 0.4); font-size: 18px; }
 
     </style>
 </head>
 <body>
 
-    <div class="container">
-        <!-- Khung Camera -->
-        <div class="glass-panel">
-            <div class="scanner-container">
-                <div class="scan-line"></div>
-                <video id="video" autoplay muted playsinline></video>
-                <canvas id="overlay"></canvas>
-            </div>
-        </div>
+    <div class="scanner-container">
+        <!-- Khung Video Toàn màn hình -->
+        <video id="video" autoplay muted playsinline></video>
+        <canvas id="overlay"></canvas>
+        <div class="scan-line"></div>
 
-        <!-- Thẻ định danh -->
-        <div id="resultCard" class="glass-panel result-panel">
+        <!-- Thẻ kết quả nổi (Overlay) -->
+        <div id="resultCard" class="result-panel">
             <div class="id-row">
                 <span class="id-label">Mã nhân sự</span>
                 <span class="id-value" id="res-mnv">...</span>
@@ -145,7 +138,7 @@
                 <span class="id-value" id="res-name">...</span>
             </div>
             <div class="id-row">
-                <span class="id-label">Độ tin cậy</span>
+                <span class="id-label">Mức độ khớp</span>
                 <span class="id-value highlight" id="res-score">...</span>
             </div>
         </div>
@@ -162,7 +155,6 @@
         let faceMatcher = null;
         let isDetecting = false;
 
-        // In trạng thái ra Console thay vì hiển thị trên UI
         function logStatus(message) {
             console.log(`[Hệ thống]: ${message}`);
         }
@@ -201,8 +193,9 @@
         }
 
         function startWebcam() {
+            // Lấy độ phân giải cao nhất màn hình có thể hỗ trợ
             navigator.mediaDevices.getUserMedia({ 
-                video: { facingMode: 'user', width: { ideal: 720 }, height: { ideal: 540 } } 
+                video: { facingMode: 'user', width: { ideal: 1080 }, height: { ideal: 1920 } } 
             })
             .then(stream => { video.srcObject = stream; })
             .catch(err => { console.error('Chưa cấp quyền truy cập Camera', err); });
@@ -232,14 +225,15 @@
                     const box = detection.detection.box;
 
                     let drawLabel = "Khách lạ";
-                    let boxColor = "#ff0f7b";
+                    let boxColor = "#ff0f7b"; // Đỏ
 
                     if (match.label !== 'unknown') {
-                        boxColor = "#00ff87";
+                        boxColor = "#00ff87"; // Xanh
                         try {
                             const personData = JSON.parse(match.label);
                             drawLabel = personData.name;
                             
+                            // Hiển thị Card dữ liệu
                             resultCard.style.display = 'block';
                             document.getElementById('res-mnv').innerText = personData.mnv;
                             document.getElementById('res-name').innerText = personData.name;
@@ -249,14 +243,15 @@
                             console.error(e);
                         }
                     } else {
-                        resultCard.style.display = 'none';
+                        // Nếu là khách lạ, ẩn thẻ thông tin đi để màn hình thoáng
+                        resultCard.style.display = 'none'; 
                     }
 
                     const drawBox = new faceapi.draw.DrawBox(box, { 
                         label: drawLabel, 
                         lineWidth: 3, 
                         boxColor: boxColor,
-                        drawLabelOptions: { fontSize: 18, fontColor: '#000', backgroundColor: boxColor, padding: 10 }
+                        drawLabelOptions: { fontSize: 20, fontColor: '#000', backgroundColor: boxColor, padding: 10 }
                     });
                     drawBox.draw(overlay);
                 });
