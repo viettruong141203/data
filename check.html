@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI Face Scanner</title>
+    <title>Face ID</title>
     <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.min.js"></script>
     <style>
@@ -68,7 +68,6 @@
             -webkit-transform: scaleX(-1);
         }
 
-        /* Dòng trạng thái nổi chính giữa camera */
         #status-msg {
             position: absolute;
             z-index: 20;
@@ -173,11 +172,15 @@
         let scanTimeout = null;
         let mediaStream = null;
         let audioCtx = null;
+        let lastDetectedMnv = null; // Biến ghi nhớ nhân sự vừa quét được để tránh kêu bíp liên tục
 
         function playSuccessSound() {
             try {
                 if (!audioCtx) {
                     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume();
                 }
                 const osc = audioCtx.createOscillator();
                 const gain = audioCtx.createGain();
@@ -312,11 +315,18 @@
                             });
                             drawBox.draw(overlay);
 
-                            playSuccessSound();
+                            // Chỉ phát âm thanh bíp MỘT LẦN duy nhất khi chuyển sang nhận diện người mới hoặc sau khi hết thời gian chờ
+                            if (lastDetectedMnv !== personData.mnv) {
+                                playSuccessSound();
+                                lastDetectedMnv = personData.mnv;
+                            }
 
                         } catch (e) { console.error(e); }
                     }
                 });
+            } else {
+                // Nếu không nhìn thấy khuôn mặt nào trong khung hình, reset lại bộ nhớ để lần sau quét lại sẽ kêu bíp tiếp
+                lastDetectedMnv = null;
             }
 
             if (matchedPerson) {
@@ -335,6 +345,7 @@
                 clearTimeout(scanTimeout);
                 scanTimeout = setTimeout(() => {
                     resultCard.classList.remove('active');
+                    lastDetectedMnv = null; // Cho phép quét lại người cũ sau khi ẩn thẻ kết quả
                 }, 2000);
 
             } else if (!scanTimeout) {
