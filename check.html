@@ -165,7 +165,6 @@
         const statusMsg = document.getElementById('status-msg');
         
         const GET_DATA_URL = 'https://script.google.com/macros/s/AKfycbzwoSShI37Pg6P4GhIYSwpcGkN_LeO0fLldHWBvYyz96PFx_qCAfV7IE3mBxFheZXrDNQ/exec';
-        const POST_DATA_URL = 'https://script.google.com/macros/s/AKfycbyOz_0L9XUbwzt50UNG7M9ftZKmeYx_NdTFjep5hc25OeTfb1YlhiwvkCPUV4fHGMeMqA/exec';
         const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/';
         
         let faceMatcher = null;
@@ -201,30 +200,6 @@
                 return `https://drive.google.com/uc?export=view&id=${match[1]}`;
             }
             return url;
-        }
-
-        function getCurrentFormattedTime() {
-            const d = new Date();
-            const timeStr = `${("0"+d.getHours()).slice(-2)}:${("0"+d.getMinutes()).slice(-2)}:${("0"+d.getSeconds()).slice(-2)}`;
-            const dateStr = `${("0"+d.getDate()).slice(-2)}/${("0"+(d.getMonth()+1)).slice(-2)}/${d.getFullYear()}`;
-            return `${timeStr} ${dateStr}`;
-        }
-
-        // Đã bỏ thời gian chờ (cooldown), hệ thống quét liên tục và gửi ngay lập tức
-        function sendToGoogleSheet(person) {
-            const payload = {
-                action: "add",
-                sheet: "Face ID",
-                Cot_C: getCurrentFormattedTime(),
-                Cot_D: person.mnv,
-                Cot_E: person.name
-            };
-
-            fetch(POST_DATA_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                body: JSON.stringify(payload)
-            }).catch(() => {});
         }
 
         async function init() {
@@ -338,7 +313,6 @@
                             drawBox.draw(overlay);
 
                             playSuccessSound();
-                            sendToGoogleSheet(personData);
 
                         } catch (e) { console.error(e); }
                     }
