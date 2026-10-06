@@ -145,7 +145,6 @@
     let scanTimer = 0; 
     let scanInterval = null;
     let collectedDescriptors = []; 
-    let existingFaceMatcher = null; 
 
     const video = document.getElementById('video');
     const statusBox = document.getElementById('status-box');
@@ -164,37 +163,11 @@
         await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
         await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
         isAiLoaded = true;
-        loadExistingDatabase(); 
       } catch(e) {
         console.error("Lỗi tải AI");
       }
     }
 
-    async function loadExistingDatabase() {
-      try {
-        const response = await fetch(SCRIPT_URL);
-        const result = await response.json();
-        if (result.status === "success" && result.data.length > 0) {
-          const labeledDescriptors = [];
-          for (let i = 0; i < result.data.length; i++) {
-            const row = result.data[i];
-            const empId = row[0], empName = row[2], rawFaceData = row[3];
-            if (!empId || !rawFaceData) continue;
-            try {
-              const parsed = typeof rawFaceData === 'string' ? JSON.parse(rawFaceData) : rawFaceData;
-              if (Array.isArray(parsed)) {
-                labeledDescriptors.push(new faceapi.LabeledFaceDescriptors(String(empName), [new Float32Array(parsed)]));
-              }
-            } catch(err) {}
-          }
-          if (labeledDescriptors.length > 0) {
-            existingFaceMatcher = new faceapi.FaceMatcher(labeledDescriptors, 0.40);
-          }
-        }
-      } catch(e) {}
-    }
-
-    // Nhập tên xong bấm nút -> Chuyển giao diện và tự động bắt đầu quét liền
     function goToScanSection() {
       const name = inputName.value.trim();
       if (!name) {
@@ -235,7 +208,7 @@
         
         video.onloadedmetadata = () => {
           video.play();
-          // 🚀 TỰ ĐỘNG KÍCH HOẠT VÒNG QUÉT NGAY KHI CAMERA MỞ XONG
+          // Kích hoạt vòng quét ngay lập tức
           beginFaceCountdown(); 
         };
       } catch(err) {
@@ -256,6 +229,7 @@
       guideCircle.classList.remove('active');
     }
 
+    // VÒNG LẶP QUÉT 1.2S TRỰC TIẾP
     function beginFaceCountdown() {
       stopScanProcess();
       collectedDescriptors = [];
@@ -278,6 +252,7 @@
           const faceCenter = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
           const tolerance = 160; 
 
+          // Kiểm tra mặt nằm trong vòng tròn định vị trung tâm
           if (Math.abs(faceCenter.x - videoCenter.x) < tolerance && Math.abs(faceCenter.y - videoCenter.y) < tolerance) {
             scanTimer += intervalMs;
             collectedDescriptors.push(detection.descriptor);
@@ -289,17 +264,6 @@
 
             if (scanTimer >= targetTimeMs) {
               stopScanProcess();
-              
-              const tempAvg = getAverageDescriptor(collectedDescriptors);
-              if (existingFaceMatcher) {
-                const matchResult = existingFaceMatcher.findBestMatch(new Float32Array(tempAvg));
-                if (matchResult.label !== "unknown") {
-                  alert(`⚠ Khuôn mặt này đã được đăng ký bởi nhân sự: "${matchResult.label}"! Không thể đăng ký trùng.`);
-                  backToInfoSection();
-                  return;
-                }
-              }
-
               statusBox.innerText = "✨ Đang lưu thông tin...";
               statusBox.style.color = "#10B981";
               
