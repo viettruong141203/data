@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Face ID - Next-Gen Registration</title>
+  <title>Face ID - Đăng Ký Nhân Sự (Double Check 0.2s)</title>
   
   <script defer src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -18,7 +18,6 @@
       color: #f8fafc;
     }
 
-    /* Hiệu ứng Thẻ kính mờ cao cấp (Glassmorphism) */
     .app-card {
       background: rgba(30, 41, 59, 0.65); backdrop-filter: blur(24px);
       -webkit-backdrop-filter: blur(24px);
@@ -40,7 +39,6 @@
     .section-card { display: flex; flex-direction: column; gap: 18px; }
     #section-scan { display: none; } 
 
-    /* Khung Camera đẳng cấp */
     .camera-container {
       position: relative; width: 100%; aspect-ratio: 1; 
       background: #020617; border-radius: 28px; overflow: hidden;
@@ -53,7 +51,6 @@
     #video.front-camera { transform: scaleX(-1); }
     #video.back-camera { transform: scaleX(1); }
 
-    /* Vòng tròn định vị phong cách AI Scanner */
     .face-guide-circle {
       position: absolute; width: 210px; height: 210px;
       border: 2px dashed rgba(99, 102, 241, 0.6); border-radius: 50%;
@@ -66,7 +63,6 @@
       transform: scale(1.02);
     }
 
-    /* Nút đổi camera thanh thoát */
     .icon-btn {
       position: absolute; top: 16px; right: 16px; width: 42px; height: 42px;
       background: rgba(15, 23, 42, 0.6); color: #FFFFFF; border: 1px solid rgba(255, 255, 255, 0.15);
@@ -77,11 +73,9 @@
     .icon-btn:hover { background: rgba(99, 102, 241, 0.8); transform: scale(1.1) rotate(180deg); border-color: transparent; }
     .icon-btn svg { width: 20px; height: 20px; stroke: currentColor; }
 
-    /* Thanh tiến trình neon mượt mà */
     .progress-container { width: 100%; background: rgba(255, 255, 255, 0.08); height: 6px; border-radius: 4px; overflow: hidden; }
     .progress-bar { width: 0%; height: 100%; background: linear-gradient(90deg, #6366F1, #10B981); transition: width 0.05s linear; border-radius: 4px; box-shadow: 0 0 10px rgba(16, 185, 129, 0.5); }
 
-    /* Form nhập liệu chuẩn giao diện tối */
     .input-group { display: flex; flex-direction: column; gap: 8px; }
     .input-group label { font-size: 0.75rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.8px; }
     .input-group input {
@@ -90,14 +84,12 @@
       transition: all 0.3s ease;
     }
     .input-group input:focus { border-color: #6366F1; background: rgba(15, 23, 42, 0.8); box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.25); }
-    .input-group input::placeholder { color: #64748b; }
 
     .status-box {
       font-size: 0.85rem; font-weight: 600; color: #94a3b8; text-align: center; min-height: 24px;
       letter-spacing: 0.2px;
     }
 
-    /* Nút bấm hiệu ứng Glow sang trọng */
     .btn {
       width: 100%; padding: 16px; border: none; border-radius: 20px;
       font-weight: 700; font-size: 1rem; cursor: pointer; transition: all 0.3s ease;
@@ -135,7 +127,7 @@
       <button class="btn btn-primary" onclick="goToScanSection()">Bắt đầu quét khuôn mặt →</button>
     </div>
 
-    <!-- PHẦN 2: INSTANT AI QUÉT 0.2S -->
+    <!-- PHẦN 2: INSTANT AI QUÉT VÀ KIỂM ĐỊNH ẢNH -->
     <div id="section-scan" class="section-card">
       <div class="camera-container" id="container">
         <button class="icon-btn" onclick="switchCamera()" title="Đổi camera">
@@ -219,6 +211,7 @@
       scanTimer = 0;
       progressBar.style.width = '0%';
       guideCircle.classList.remove('active');
+      if (video) video.play(); // Đảm bảo bỏ đóng băng video
       if (currentStream) currentStream.getTracks().forEach(t => t.stop());
       
       sectionScan.style.display = 'none';
@@ -231,7 +224,7 @@
 
       try {
         currentStream = await navigator.mediaDevices.getUserMedia({ 
-          video: { width: { ideal: 640 }, height: { ideal: 640 }, facingMode: facingMode } 
+          video: { width: { ideal: 720 }, height: { ideal: 720 }, facingMode: facingMode } 
         });
         video.srcObject = currentStream;
         video.className = facingMode === "user" ? "front-camera" : "back-camera";
@@ -254,10 +247,9 @@
       startCamera(currentFacingMode);
     }
 
-    // 🚀 INSTANT AI LOOP: TỐC ĐỘ 0.2 GIÂY CHỚP NHOÁNG
     async function runInstantDetectionLoop() {
       const options = new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.5 });
-      const targetTimeMs = 200; // 0.2 giây
+      const targetTimeMs = 200; 
       const frameIntervalMs = 25; 
       let lastTime = Date.now();
 
@@ -290,11 +282,9 @@
                 statusBox.innerText = `Đang quét ngay lập tức...`;
 
                 if (scanTimer >= targetTimeMs) {
+                  // Đủ 0.2s -> Chuyển qua bước KIỂM ĐỊNH ẢNH
                   isScanningActive = false;
-                  statusBox.innerText = "✨ Đang lưu thông tin...";
-                  statusBox.style.color = "#34d399";
-                  
-                  executeSaveData();
+                  executeFinalValidation();
                   return; 
                 }
               } else {
@@ -303,9 +293,7 @@
             } else {
               resetCountdown("🔍 Đang tìm kiếm khuôn mặt...");
             }
-          } catch (err) {
-            console.error("AI frame error:", err);
-          }
+          } catch (err) {}
         }
 
         if (isScanningActive) {
@@ -327,23 +315,14 @@
       }
     }
 
-    function getAverageDescriptor(descriptors) {
-      if (descriptors.length === 0) return [];
-      const len = descriptors[0].length;
-      const avg = new Float32Array(len);
-      for (let i = 0; i < len; i++) {
-        let sum = 0;
-        for (let j = 0; j < descriptors.length; j++) {
-          sum += descriptors[j][i];
-        }
-        avg[i] = sum / descriptors.length;
-      }
-      return Array.from(avg);
-    }
+    // 🚀 BƯỚC KIỂM ĐỊNH KÉP: Đảm bảo bức ảnh tĩnh vừa chụp là chuẩn nét 100%
+    async function executeFinalValidation() {
+      // 1. Đóng băng video (Freeze frame)
+      video.pause();
+      statusBox.innerText = "🔍 Đang kiểm định chất lượng ảnh...";
+      statusBox.style.color = "#fbbf24"; // Màu vàng cảnh báo đang xử lý
 
-    async function executeSaveData() {
-      if (currentStream) currentStream.getTracks().forEach(t => t.stop());
-
+      // 2. Chụp khung hình hiện tại ra Canvas
       const canvas = document.createElement('canvas');
       canvas.width = video.videoWidth; canvas.height = video.videoHeight;
       const ctx = canvas.getContext('2d');
@@ -351,10 +330,36 @@
         ctx.translate(canvas.width, 0); ctx.scale(-1, 1);
       }
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      // 3. Cho AI quét lại chính bức ảnh tĩnh này với inputSize cao hơn (416) để test độ nét
+      const highResOptions = new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.5 });
+      const finalDetection = await faceapi.detectSingleFace(canvas, highResOptions).withFaceLandmarks().withFaceDescriptor();
+
+      if (!finalDetection) {
+        // Ảnh tĩnh bị mờ hoặc nhòe mặt -> Từ chối, yêu cầu quét lại
+        statusBox.innerText = "⚠️ Ảnh chụp khoảnh khắc cuối bị mờ. Đang tự động quét lại...";
+        statusBox.style.color = "#f87171";
+        
+        // Nghỉ 1.5s để người dùng đọc thông báo rồi tự động mở lại camera
+        setTimeout(() => {
+          resetCountdown("Khởi động lại...");
+          video.play();
+          isScanningActive = true;
+          runInstantDetectionLoop();
+        }, 1500);
+        return;
+      }
+
+      // NẾU ẢNH CHUẨN -> ĐẨY LÊN GOOGLE SHEETS & DRIVE
+      statusBox.innerText = "✨ Ảnh chuẩn xác! Đang tải lên máy chủ...";
+      statusBox.style.color = "#34d399";
+      
       const imageBase64 = canvas.toDataURL('image/jpeg', 0.85);
 
-      const finalDescriptor = getAverageDescriptor(collectedDescriptors);
+      // Lấy thêm trung bình cộng của các descriptor đã quét trong 0.2s để tăng độ chính xác AI
+      const avgDescriptor = getAverageDescriptor(collectedDescriptors);
 
+      // Định dạng thời gian
       const now = new Date();
       const hh = String(now.getHours()).padStart(2, '0');
       const mm = String(now.getMinutes()).padStart(2, '0');
@@ -366,7 +371,7 @@
 
       const payload = {
         name: inputName.value.trim(),
-        faceData: JSON.stringify(finalDescriptor),
+        faceData: JSON.stringify(avgDescriptor),
         time: timeWeb,
         imageBase64: imageBase64
       };
@@ -390,6 +395,20 @@
         alert("Lỗi kết nối mạng, vui lòng thử lại!");
         backToInfoSection();
       }
+    }
+
+    function getAverageDescriptor(descriptors) {
+      if (descriptors.length === 0) return [];
+      const len = descriptors[0].length;
+      const avg = new Float32Array(len);
+      for (let i = 0; i < len; i++) {
+        let sum = 0;
+        for (let j = 0; j < descriptors.length; j++) {
+          sum += descriptors[j][i];
+        }
+        avg[i] = sum / descriptors.length;
+      }
+      return Array.from(avg);
     }
 
     window.onload = initAI;
