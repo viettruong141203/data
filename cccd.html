@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>CCCD AI Scanner</title>
-    <script async src="https://docs.opencv.org/4.8.0/opencv.js" onload="onOpenCvReady();"></script>
+    <title>CCCD Scanner Pro</title>
+    <!-- ĐỔI SANG MÁY CHỦ JSDELIVR SIÊU TỐC -->
+    <script async src="https://cdn.jsdelivr.net/npm/@techstark/opencv-js@4.8.0/build/opencv.js" onload="onOpenCvReady();"></script>
     <style>
         * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, sans-serif; }
         body { 
@@ -51,7 +52,7 @@
             width: 100%; max-width: 200px; margin-top: 10px;
             border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1);
         }
-        #instruction { font-size: 17px; font-weight: 600; color: #fbbf24; margin-bottom: 20px; min-height: 25px;}
+        #instruction { font-size: 17px; font-weight: 600; color: #fbbf24; margin-bottom: 20px; min-height: 25px; transition: color 0.3s; }
         #flashEffect { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: white; opacity: 0; pointer-events: none; transition: opacity 0.1s ease-out; z-index: 10; }
     </style>
 </head>
@@ -75,7 +76,7 @@
         </div>
 
         <button class="btn-capture" id="btnMainAction">📸 CHỤP MẶT TRƯỚC</button>
-        <div id="statusText" style="display:none; color:#34d399; margin-top:15px; font-weight:bold;">⏳ Đang xử lý AI và tải lên Drive...</div>
+        <div id="statusText" style="display:none; color:#34d399; margin-top:15px; font-weight:bold;">⏳ Đang xử lý và tải lên Drive...</div>
 
         <div class="result-container" id="results" style="display: none;">
             <div class="result-item">MẶT TRƯỚC<br><canvas id="canvasFront"></canvas></div>
@@ -86,13 +87,26 @@
     </div>
 
     <script>
-        // LINK APPS SCRIPT CỦA BẠN (GIỮ NGUYÊN)
+        // LINK APPS SCRIPT CỦA BẠN 
         const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw75f616BH-U49XkdmJ4OIyhcxaiC6L24VqcdxkQnY2ZE9VYOcfjN2Nams2jyIGGznoeg/exec"; 
         
         let cvReady = false;
+        
+        // CƠ CHẾ CHỐNG ĐƠ: Nếu 8 giây mà AI chưa tải xong thì mở khóa các nút luôn.
+        let fallbackTimeout = setTimeout(() => {
+            if (!cvReady) {
+                document.getElementById('instruction').innerHTML = "⚠️ Mạng yếu! Đã chuyển sang chế độ cắt thủ công.";
+                document.getElementById('instruction').style.color = "#f87171"; // Màu đỏ nhạt
+                document.getElementById('btnStartCamera').disabled = false;
+                document.getElementById('btnUpload').disabled = false;
+            }
+        }, 8000);
+
         function onOpenCvReady() {
             cvReady = true;
+            clearTimeout(fallbackTimeout);
             document.getElementById('instruction').innerHTML = "✅ AI sẵn sàng! Vui lòng chọn:";
+            document.getElementById('instruction').style.color = "#34d399";
             document.getElementById('btnStartCamera').disabled = false;
             document.getElementById('btnUpload').disabled = false;
         }
@@ -113,6 +127,7 @@
                 document.getElementById('startGroup').style.display = 'none';
                 document.getElementById('btnMainAction').style.display = 'block';
                 document.getElementById('instruction').innerHTML = "Căn <span style='color:#38bdf8'>MẶT TRƯỚC</span> vào khung";
+                document.getElementById('instruction').style.color = "#fbbf24";
             } catch (err) {
                 alert("Vui lòng cấp quyền Camera trên trình duyệt!");
             }
@@ -125,7 +140,7 @@
             const file = e.target.files[0];
             const reader = new FileReader();
             
-            document.getElementById('instruction').innerHTML = "⏳ AI đang phân tích ảnh...";
+            document.getElementById('instruction').innerHTML = "⏳ Đang phân tích ảnh...";
             document.getElementById('startGroup').style.display = 'none';
             
             reader.onload = function(event) {
@@ -163,57 +178,70 @@
                 hiddenCanvas.getContext('2d').drawImage(video, 0, 0, hiddenCanvas.width, hiddenCanvas.height);
             }
 
-            let src = cv.imread(hiddenCanvas);
-            let gray = new cv.Mat();
-            cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY, 0);
-            cv.GaussianBlur(gray, gray, new cv.Size(5, 5), 0, 0, cv.BORDER_DEFAULT);
-            cv.Canny(gray, gray, 75, 200);
-
-            let contours = new cv.MatVector();
-            let hierarchy = new cv.Mat();
-            cv.findContours(gray, contours, hierarchy, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE);
-
-            let maxArea = 0;
-            let bestContour = null;
-
-            for (let i = 0; i < contours.size(); ++i) {
-                let cnt = contours.get(i);
-                let area = cv.contourArea(cnt);
-                if (area > (src.cols * src.rows * 0.1)) { 
-                    let peri = cv.arcLength(cnt, true);
-                    let approx = new cv.Mat();
-                    cv.approxPolyDP(cnt, approx, 0.02 * peri, true);
-                    if (approx.rows === 4 && area > maxArea) {
-                        maxArea = area;
-                        bestContour = approx.clone();
-                    }
-                    approx.delete();
-                }
-            }
-
             const canvasOut = document.getElementById(canvasOutId);
             canvasOut.width = 856; canvasOut.height = 540; 
             const ctxOut = canvasOut.getContext('2d');
+            let aiSuccess = false;
 
-            if (bestContour) {
-                let pts = [];
-                for(let i=0; i<4; i++) { pts.push({x: bestContour.data32S[i*2], y: bestContour.data32S[i*2+1]}); }
-                pts.sort((a,b) => (a.x+a.y) - (b.x+b.y));
-                let tl = pts[0], br = pts[3];
-                let rem = [pts[1], pts[2]].sort((a,b) => (a.x-a.y) - (b.x-b.y));
-                let bl = rem[0], tr = rem[1];
+            // NẾU TẢI ĐƯỢC AI -> CHẠY AI TÌM VIỀN
+            if (cvReady && typeof cv !== 'undefined' && cv.Mat) {
+                try {
+                    let src = cv.imread(hiddenCanvas);
+                    let gray = new cv.Mat();
+                    cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY, 0);
+                    cv.GaussianBlur(gray, gray, new cv.Size(5, 5), 0, 0, cv.BORDER_DEFAULT);
+                    cv.Canny(gray, gray, 75, 200);
 
-                let srcTri = cv.matFromArray(4, 1, cv.CV_32FC2, [tl.x, tl.y, tr.x, tr.y, br.x, br.y, bl.x, bl.y]);
-                let dstTri = cv.matFromArray(4, 1, cv.CV_32FC2, [0, 0, canvasOut.width, 0, canvasOut.width, canvasOut.height, 0, canvasOut.height]);
+                    let contours = new cv.MatVector();
+                    let hierarchy = new cv.Mat();
+                    cv.findContours(gray, contours, hierarchy, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE);
 
-                let M = cv.getPerspectiveTransform(srcTri, dstTri);
-                let warped = new cv.Mat();
-                let dsize = new cv.Size(canvasOut.width, canvasOut.height);
-                cv.warpPerspective(src, warped, M, dsize, cv.INTER_LINEAR, cv.BORDER_CONSTANT, new cv.Scalar());
+                    let maxArea = 0;
+                    let bestContour = null;
 
-                cv.imshow(canvasOutId, warped);
-                srcTri.delete(); dstTri.delete(); M.delete(); warped.delete(); bestContour.delete();
-            } else {
+                    for (let i = 0; i < contours.size(); ++i) {
+                        let cnt = contours.get(i);
+                        let area = cv.contourArea(cnt);
+                        if (area > (src.cols * src.rows * 0.1)) { 
+                            let peri = cv.arcLength(cnt, true);
+                            let approx = new cv.Mat();
+                            cv.approxPolyDP(cnt, approx, 0.02 * peri, true);
+                            if (approx.rows === 4 && area > maxArea) {
+                                maxArea = area;
+                                bestContour = approx.clone();
+                            }
+                            approx.delete();
+                        }
+                    }
+
+                    if (bestContour) {
+                        let pts = [];
+                        for(let i=0; i<4; i++) { pts.push({x: bestContour.data32S[i*2], y: bestContour.data32S[i*2+1]}); }
+                        pts.sort((a,b) => (a.x+a.y) - (b.x+b.y));
+                        let tl = pts[0], br = pts[3];
+                        let rem = [pts[1], pts[2]].sort((a,b) => (a.x-a.y) - (b.x-b.y));
+                        let bl = rem[0], tr = rem[1];
+
+                        let srcTri = cv.matFromArray(4, 1, cv.CV_32FC2, [tl.x, tl.y, tr.x, tr.y, br.x, br.y, bl.x, bl.y]);
+                        let dstTri = cv.matFromArray(4, 1, cv.CV_32FC2, [0, 0, canvasOut.width, 0, canvasOut.width, canvasOut.height, 0, canvasOut.height]);
+
+                        let M = cv.getPerspectiveTransform(srcTri, dstTri);
+                        let warped = new cv.Mat();
+                        let dsize = new cv.Size(canvasOut.width, canvasOut.height);
+                        cv.warpPerspective(src, warped, M, dsize, cv.INTER_LINEAR, cv.BORDER_CONSTANT, new cv.Scalar());
+
+                        cv.imshow(canvasOutId, warped);
+                        srcTri.delete(); dstTri.delete(); M.delete(); warped.delete(); bestContour.delete();
+                        aiSuccess = true;
+                    }
+                    src.delete(); gray.delete(); contours.delete(); hierarchy.delete();
+                } catch (e) {
+                    console.log("AI gặp lỗi khi cắt hình, chuyển sang cắt thủ công.", e);
+                }
+            }
+
+            // NẾU AI TẢI XỊT HOẶC KHÔNG TÌM THẤY THẺ -> CẮT THEO KHUNG
+            if (!aiSuccess) {
                 if (fromLiveCamera) {
                     const guideRect = document.getElementById('guide').getBoundingClientRect();
                     const videoRect = video.getBoundingClientRect();
@@ -225,7 +253,7 @@
                 }
             }
 
-            src.delete(); gray.delete(); contours.delete(); hierarchy.delete();
+            // LUÔN LUÔN BO TRÒN GÓC THẺ
             applyRoundedCorners(canvasOut, ctxOut); 
         }
 
