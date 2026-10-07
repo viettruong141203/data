@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>CCCD AI Scanner</title>
-    <!-- Tải thư viện AI OpenCV.js -->
     <script async src="https://docs.opencv.org/4.8.0/opencv.js" onload="onOpenCvReady();"></script>
     <style>
         * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, sans-serif; }
@@ -59,15 +58,14 @@
 <body>
 
     <div class="glass-panel">
-        <h2 style="margin-top:0;">CCCD AI Scanner</h2>
-        <div id="instruction">⏳ Đang tải thư viện AI...</div>
+        <h2 style="margin-top:0;">Hệ Thống Quét CCCD</h2>
+        <div id="instruction">⏳ Đang tải AI nhận diện...</div>
         
         <div class="action-group" id="startGroup">
-            <button class="btn-primary" id="btnStartCamera" disabled>📸 Bật Camera</button>
-            <button class="btn-secondary" id="btnUpload" disabled>📁 Chọn ảnh từ máy</button>
+            <button class="btn-primary" id="btnStartCamera" disabled>📸 Bật Camera quét trực tiếp</button>
+            <button class="btn-secondary" id="btnUpload" disabled>📁 Chọn ảnh có sẵn từ máy</button>
         </div>
         
-        <!-- Input file ẩn để lấy ảnh từ thư viện -->
         <input type="file" id="fileInput" accept="image/*" style="display: none;">
 
         <div id="camera-container">
@@ -77,7 +75,7 @@
         </div>
 
         <button class="btn-capture" id="btnMainAction">📸 CHỤP MẶT TRƯỚC</button>
-        <div id="statusText" style="display:none; color:#34d399; margin-top:15px; font-weight:bold;">⏳ Đang xử lý...</div>
+        <div id="statusText" style="display:none; color:#34d399; margin-top:15px; font-weight:bold;">⏳ Đang xử lý AI và tải lên Drive...</div>
 
         <div class="result-container" id="results" style="display: none;">
             <div class="result-item">MẶT TRƯỚC<br><canvas id="canvasFront"></canvas></div>
@@ -88,12 +86,13 @@
     </div>
 
     <script>
+        // LINK APPS SCRIPT CỦA BẠN (GIỮ NGUYÊN)
         const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw75f616BH-U49XkdmJ4OIyhcxaiC6L24VqcdxkQnY2ZE9VYOcfjN2Nams2jyIGGznoeg/exec"; 
         
         let cvReady = false;
         function onOpenCvReady() {
             cvReady = true;
-            document.getElementById('instruction').innerHTML = "✅ AI đã sẵn sàng! Chọn phương thức:";
+            document.getElementById('instruction').innerHTML = "✅ AI sẵn sàng! Vui lòng chọn:";
             document.getElementById('btnStartCamera').disabled = false;
             document.getElementById('btnUpload').disabled = false;
         }
@@ -104,7 +103,6 @@
         let step = 1;
         let isUsingCamera = false;
 
-        // 1. CHẾ ĐỘ MỞ CAMERA
         document.getElementById('btnStartCamera').addEventListener('click', async () => {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } } });
@@ -114,51 +112,43 @@
                 document.getElementById('camera-container').style.display = 'block';
                 document.getElementById('startGroup').style.display = 'none';
                 document.getElementById('btnMainAction').style.display = 'block';
-                document.getElementById('instruction').innerHTML = "Đưa <span style='color:#38bdf8'>MẶT TRƯỚC</span> vào camera";
+                document.getElementById('instruction').innerHTML = "Căn <span style='color:#38bdf8'>MẶT TRƯỚC</span> vào khung";
             } catch (err) {
-                alert("Lỗi Camera! Vui lòng cấp quyền.");
+                alert("Vui lòng cấp quyền Camera trên trình duyệt!");
             }
         });
 
-        // 2. CHẾ ĐỘ LẤY ẢNH TỪ MÁY
-        document.getElementById('btnUpload').addEventListener('click', () => {
-            fileInput.click(); // Mở hộp thoại chọn file
-        });
+        document.getElementById('btnUpload').addEventListener('click', () => { fileInput.click(); });
 
         fileInput.addEventListener('change', function(e) {
             if(e.target.files.length === 0) return;
             const file = e.target.files[0];
             const reader = new FileReader();
             
-            document.getElementById('instruction').innerHTML = "⏳ Đang phân tích ảnh...";
-            document.getElementById('startGroup').style.display = 'none'; // Ẩn nút chọn
+            document.getElementById('instruction').innerHTML = "⏳ AI đang phân tích ảnh...";
+            document.getElementById('startGroup').style.display = 'none';
             
             reader.onload = function(event) {
                 const img = new Image();
                 img.onload = function() {
-                    // Vẽ ảnh tải lên vào canvas ẩn
-                    hiddenCanvas.width = img.width;
-                    hiddenCanvas.height = img.height;
-                    const hCtx = hiddenCanvas.getContext('2d');
-                    hCtx.drawImage(img, 0, 0);
+                    hiddenCanvas.width = img.width; hiddenCanvas.height = img.height;
+                    hiddenCanvas.getContext('2d').drawImage(img, 0, 0);
 
-                    // Xử lý ảnh
                     if (step === 1) {
                         processImageSource('canvasFront', false);
                         document.getElementById('results').style.display = 'flex';
                         step = 2;
-                        document.getElementById('instruction').innerHTML = "Tải lên <span style='color:#10b981'>MẶT SAU</span>";
+                        document.getElementById('instruction').innerHTML = "Tiếp tục tải <span style='color:#10b981'>MẶT SAU</span>";
                         
-                        // Hiển thị lại nút tải ảnh nhưng đổi chữ
                         document.getElementById('startGroup').style.display = 'flex';
-                        document.getElementById('btnStartCamera').style.display = 'none'; // Giấu nút camera đi
+                        document.getElementById('btnStartCamera').style.display = 'none';
                         document.getElementById('btnUpload').innerHTML = "📁 CHỌN ẢNH MẶT SAU";
-                        fileInput.value = ""; // Reset file input
+                        fileInput.value = ""; 
                         
                     } else if (step === 2) {
                         processImageSource('canvasBack', false);
                         document.getElementById('startGroup').style.display = 'none';
-                        document.getElementById('instruction').innerHTML = "🎉 Xử lý xong! Đang tải lên Drive...";
+                        document.getElementById('instruction').innerHTML = "🎉 Đang ghép A4 và lưu lên Drive...";
                         processAndUpload();
                     }
                 }
@@ -167,11 +157,9 @@
             reader.readAsDataURL(file);
         });
 
-        // HÀM AI: TÌM 4 GÓC VÀ CẮT (Dùng chung cho cả Camera và Upload)
         function processImageSource(canvasOutId, fromLiveCamera) {
             if (fromLiveCamera) {
-                hiddenCanvas.width = video.videoWidth;
-                hiddenCanvas.height = video.videoHeight;
+                hiddenCanvas.width = video.videoWidth; hiddenCanvas.height = video.videoHeight;
                 hiddenCanvas.getContext('2d').drawImage(video, 0, 0, hiddenCanvas.width, hiddenCanvas.height);
             }
 
@@ -191,7 +179,6 @@
             for (let i = 0; i < contours.size(); ++i) {
                 let cnt = contours.get(i);
                 let area = cv.contourArea(cnt);
-                // Lọc kích thước để tìm khung thẻ
                 if (area > (src.cols * src.rows * 0.1)) { 
                     let peri = cv.arcLength(cnt, true);
                     let approx = new cv.Mat();
@@ -209,7 +196,6 @@
             const ctxOut = canvasOut.getContext('2d');
 
             if (bestContour) {
-                // AI nắn thẳng thẻ nếu chụp bị nghiêng
                 let pts = [];
                 for(let i=0; i<4; i++) { pts.push({x: bestContour.data32S[i*2], y: bestContour.data32S[i*2+1]}); }
                 pts.sort((a,b) => (a.x+a.y) - (b.x+b.y));
@@ -228,7 +214,6 @@
                 cv.imshow(canvasOutId, warped);
                 srcTri.delete(); dstTri.delete(); M.delete(); warped.delete(); bestContour.delete();
             } else {
-                // FALLBACK: Nếu AI không tìm được viền
                 if (fromLiveCamera) {
                     const guideRect = document.getElementById('guide').getBoundingClientRect();
                     const videoRect = video.getBoundingClientRect();
@@ -236,23 +221,21 @@
                     const cX = (guideRect.left - videoRect.left)*sX, cY = (guideRect.top - videoRect.top)*sY;
                     ctxOut.drawImage(hiddenCanvas, cX, cY, guideRect.width*sX, guideRect.height*sY, 0, 0, canvasOut.width, canvasOut.height);
                 } else {
-                    // Nếu là ảnh upload mà không nhận diện được, lấy toàn bộ ảnh gốc ép vào khung thẻ
                     ctxOut.drawImage(hiddenCanvas, 0, 0, hiddenCanvas.width, hiddenCanvas.height, 0, 0, canvasOut.width, canvasOut.height);
                 }
             }
 
             src.delete(); gray.delete(); contours.delete(); hierarchy.delete();
-            applyRoundedCorners(canvasOut, ctxOut); // Luôn luôn bo tròn 4 góc
+            applyRoundedCorners(canvasOut, ctxOut); 
         }
 
-        // HÀM BO GÓC TRÒN CCCD
         function applyRoundedCorners(canvas, ctx) {
             const tempCanvas = document.createElement('canvas');
             tempCanvas.width = canvas.width; tempCanvas.height = canvas.height;
             tempCanvas.getContext('2d').drawImage(canvas, 0, 0);
 
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            const cr = 35; // Bán kính bo cong chuẩn thẻ
+            const cr = 35; 
             ctx.beginPath();
             ctx.moveTo(cr, 0); ctx.lineTo(canvas.width - cr, 0); ctx.quadraticCurveTo(canvas.width, 0, canvas.width, cr);
             ctx.lineTo(canvas.width, canvas.height - cr); ctx.quadraticCurveTo(canvas.width, canvas.height, canvas.width - cr, canvas.height);
@@ -263,11 +246,9 @@
             ctx.drawImage(tempCanvas, 0, 0);
         }
 
-        // XỬ LÝ NÚT CHỤP BẰNG CAMERA
         document.getElementById('btnMainAction').addEventListener('click', () => {
             const flashEff = document.getElementById('flashEffect');
-            flashEff.style.opacity = '1';
-            setTimeout(() => { flashEff.style.opacity = '0'; }, 150);
+            flashEff.style.opacity = '1'; setTimeout(() => { flashEff.style.opacity = '0'; }, 150);
 
             if (step === 1) {
                 processImageSource('canvasFront', true);
@@ -286,7 +267,6 @@
             }
         });
 
-        // HÀM GHÉP A4 & LƯU LÊN DRIVE / SHEET
         async function processAndUpload() {
             document.getElementById('statusText').style.display = 'block';
             const canvasA4 = document.createElement('canvas');
@@ -308,7 +288,7 @@
                     headers: { 'Content-Type': 'text/plain;charset=utf-8' }
                 });
                 const res = await response.json();
-                document.getElementById('statusText').innerHTML = `✅ Thành công! Mã Hồ sơ: ${res.id} <br><br> <a href="${res.url}" target="_blank" style="color:#38bdf8; text-decoration:none; border:1px solid #38bdf8; padding:8px; border-radius:5px;">🔗 MỞ BẢN IN A4</a>`;
+                document.getElementById('statusText').innerHTML = `✅ Xong! Mã: ${res.id} <br><br> <a href="${res.url}" target="_blank" style="color:#38bdf8; border:1px solid #38bdf8; padding:8px; border-radius:5px; text-decoration:none;">🔗 MỞ BẢN A4 TẠI ĐÂY</a>`;
             } catch (e) {
                 document.getElementById('statusText').innerHTML = "❌ Lỗi kết nối máy chủ!";
             }
